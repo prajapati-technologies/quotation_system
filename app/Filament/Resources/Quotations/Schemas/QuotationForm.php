@@ -408,6 +408,7 @@ class QuotationForm
 
         $total = 0;
         $totalArea = 0;
+        $installationTotal = 0;
         $service = new PricingService();
 
         // Calculate all item prices
@@ -430,6 +431,10 @@ class QuotationForm
             // Sum total applied area (Sqm) across all items
             $itemArea = floatval(str_replace(',', '', $calculation['details']['applied_area_sqm'] ?? 0));
             $totalArea += $itemArea;
+
+            // Installation total = per Sqm install fee × total Sqm (per item)
+            $installPerSqm = floatval($item['installation_cost'] ?? 0);
+            $installationTotal += $installPerSqm * $itemArea;
         }
 
         $formattedTotal = number_format($total, 2, '.', '');
@@ -439,12 +444,13 @@ class QuotationForm
         $totalDiscount = $discountPerSqm * $totalArea;
         $totalDiscount = min($totalDiscount, $total); // subtotal se zyada na ho
 
-        // VAT after discount
+        // VAT after discount (installation amount not taxed here)
         $taxBase = max(0, $total - $totalDiscount);
         $vatPercent = floatval($get("{$rootPrefix}vat_percent") ?? 0);
         $vatAmount = $taxBase * $vatPercent / 100;
 
-        $finalTotal = $taxBase + $vatAmount;
+        // Grand total includes installation charge
+        $finalTotal = $taxBase + $vatAmount + $installationTotal;
 
         $formattedVat = number_format($vatAmount, 2, '.', '');
         $formattedFinal = number_format($finalTotal, 2, '.', '');
