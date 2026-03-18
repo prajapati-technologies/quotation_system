@@ -162,15 +162,27 @@
     @php
         // Calculate total area and discount total for summary
         $totalArea = 0;
+        $installationTotal = 0;
+
         foreach ($quotation->items as $areaItem) {
             $w = floatval($areaItem->width ?? 0);
             $h = floatval($areaItem->height ?? 0);
             $calculatedArea = ($w / 1000) * ($h / 1000);
-            $areaSqm = max($calculatedArea, 1.0);
-            $totalArea += $areaSqm;
+            $areaSqm = max($calculatedArea, 1.0); // area per piece in Sqm (min 1)
+
+            $qty = floatval($areaItem->quantity ?? 1);
+            $totalArea += $areaSqm * $qty; // total Sqm = area per piece × quantity
+
+            // Installation total = per Sqm install fee × total Sqm
+            $installPerSqm = floatval($areaItem->installation_cost ?? 0);
+            $installationTotal += $installPerSqm * $areaSqm * $qty;
         }
+
         $discountPerSqm = floatval($quotation->discount ?? 0);
         $discountTotal = $discountPerSqm * $totalArea;
+
+        // Total after discount but before VAT
+        $preVatTotal = max(0, floatval($quotation->total_price ?? 0) - $discountTotal);
     @endphp
 
     <div class="section-title">Line Items</div>
@@ -185,7 +197,6 @@
                 <th>Color / Glass</th>
                 <th>Class</th>
                 <th>Qty</th>
-                <th>Install</th>
                 <th>Price</th>
             </tr>
         </thead>
@@ -260,11 +271,6 @@
                     {{-- Qty --}}
                     <td style="text-align:center;">{{ $item->quantity }}</td>
 
-                    {{-- Installation --}}
-                    <td style="text-align:right; white-space:nowrap;">
-                        ฿{{ number_format($item->installation_cost ?? 0, 2) }}
-                    </td>
-
                     {{-- Price --}}
                     <td style="text-align:right; white-space:nowrap;">
                         ฿{{ number_format($item->price, 2) }}
@@ -278,12 +284,16 @@
     <div class="total-box clearfix">
         <table>
             <tr>
-                <td>Subtotal</td>
+                <td>Total</td>
                 <td style="text-align:right;">฿{{ number_format($quotation->total_price, 2) }}</td>
             </tr>
             <tr>
-                <td>Discount ({{ number_format($quotation->discount ?? 0, 2) }} ฿/Sqm)</td>
+                <td>Discount</td>
                 <td style="text-align:right;">- ฿{{ number_format($discountTotal, 2) }}</td>
+            </tr>
+            <tr>
+                <td>Install Price</td>
+                <td style="text-align:right;">฿{{ number_format($installationTotal, 2) }}</td>
             </tr>
             <tr>
                 <td>VAT ({{ number_format($quotation->vat_percent ?? 0, 2) }}%)</td>
