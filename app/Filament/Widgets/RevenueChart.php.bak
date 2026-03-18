@@ -1,0 +1,65 @@
+<?php
+
+namespace App\Filament\Widgets;
+
+use App\Models\Quotation;
+use Filament\Widgets\ChartWidget;
+use Flowframe\Trend\Trend;
+use Flowframe\Trend\TrendValue;
+
+class RevenueChart extends ChartWidget
+{
+    protected ?string $heading = 'Revenue Trend';
+    
+    protected static ?int $sort = 3;
+
+    protected function getData(): array
+    {
+        // Simple manual grouping for now since 'Trend' might not be installed
+        $data = Quotation::whereIn('status', ['Approved', 'Production', 'Completed'])
+            ->selectRaw('SUM(final_price) as sum, DATE_FORMAT(created_at, "%m") as month')
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get();
+
+        $months = [
+            '01' => 'Jan', '02' => 'Feb', '03' => 'Mar', '04' => 'Apr',
+            '05' => 'May', '06' => 'Jun', '07' => 'Jul', '08' => 'Aug',
+            '09' => 'Sep', '10' => 'Oct', '11' => 'Nov', '12' => 'Dec'
+        ];
+
+        $chartData = array_fill(0, 12, 0);
+        $labels = array_values($months);
+
+        foreach ($data as $item) {
+            $index = intval($item->month) - 1;
+            if ($index >= 0 && $index < 12) {
+                $chartData[$index] = $item->sum;
+            }
+        }
+
+        return [
+            'datasets' => [
+                [
+                    'label' => 'Total Revenue ($)',
+                    'data' => $chartData,
+                    'fill' => true,
+                    'tension' => 0.4,
+                    'borderColor' => '#1e40af',
+                    'backgroundColor' => 'rgba(30, 64, 175, 0.08)',
+                    'pointBackgroundColor' => '#ffffff',
+                    'pointBorderColor' => '#1e40af',
+                    'pointBorderWidth' => 3,
+                    'pointRadius' => 6,
+                    'pointHoverRadius' => 9,
+                ],
+            ],
+            'labels' => $labels,
+        ];
+    }
+
+    protected function getType(): string
+    {
+        return 'line';
+    }
+}

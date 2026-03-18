@@ -1,0 +1,154 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+    --primary-gradient: linear-gradient(135deg, #7a1a1a 0%, #9b2121 100%);
+}
+
+body {
+    background: #0f172a !important;
+    font-family: 'Outfit', sans-serif !important;
+}
+
+/* 1. NUCLEAR SUPPRESSION OF ALL DEFAULT BRANDING */
+/* This targets the default Filament simple layout header specifically */
+.fi-simple-layout .fi-simple-header,
+.fi-simple-layout .fi-logo,
+.fi-simple-layout .fi-simple-header-heading,
+.fi-simple-layout .fi-simple-header-subheading {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    opacity: 0 !important;
+}
+
+/* Background for the entire layout */
+.fi-simple-layout {
+    background-image: url('/images/login-bg-reference.jpg') !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    min-height: 100vh !important;
+}
+
+/* Base Card Styling */
+.fi-simple-main {
+    background: white !important;
+    border-radius: 20px !important;
+    padding: 3rem !important;
+    box-shadow: 0 40px 80px -15px rgba(0, 0, 0, 0.5) !important;
+    max-width: 480px !important;
+    width: 100% !important;
+    margin-top: 10rem !important;
+    /* Make room for the branding we inject via hook */
+    position: relative !important;
+    overflow: visible !important;
+}
+
+/* Input Styles */
+.fi-fo-field-wrp-label label {
+    font-size: 0.95rem !important;
+    color: #475569 !important;
+    font-weight: 600 !important;
+}
+
+.fi-input-wrp {
+    height: 52px !important;
+    border-radius: 10px !important;
+    border: 1px solid #e2e8f0 !important;
+}
+
+/* Button Refinement */
+.fi-btn {
+    height: 58px !important;
+    border-radius: 10px !important;
+    background: var(--primary-gradient) !important;
+    box-shadow: 0 10px 15px -3px rgba(30, 58, 138, 0.3) !important;
+    font-weight: 700 !important;
+    font-size: 1.1rem !important;
+}
+
+.fi-btn span {
+    display: none !important;
+}
+
+.fi-btn::after {
+    content: "Login" !important;
+}
+
+/* Dashboard Restoration */
+.fi-sidebar {
+    background-color: #010409 !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.fi-sidebar-active {
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%) !important;
+    border-radius: 12px !important;
+}
+
+.fi-topbar {
+    background: rgba(255, 255, 255, 0.8) !important;
+    backdrop-filter: blur(20px) !important;
+}
+
+.fi-wi-stats-overview-stat,
+.fi-wi-widget {
+    background: white !important;
+    border-radius: 24px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05) !important;
+}
+
+.fi-ta-header {
+    background: #fcfcfc !important;
+}
+
+/* Form Label Enhancements */
+.fi-fo-field-wrp-label label {
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    color: #1e293b !important;
+    margin-bottom: 0.5rem !important;
+}
+
+/* Form Input Styling */
+.fi-input {
+    font-size: 0.95rem !important;
+}
+
+/* Button Font Size Reduction */
+.fi-btn {
+    font-size: 0.9rem !important;
+}
+
+/* Section Headers */
+.fi-section-header-heading {
+    font-size: 1.1rem !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+}
+
+.fi-section-header-description {
+    font-size: 0.875rem !important;
+    color: #64748b !important;
+}
+
+/* Global fix - Remove "Login" text from all buttons across admin dashboard */
+.fi-btn-label {
+    display: inline-block;
+}
+
+/* Hide any text node that contains "Login" after button labels */
+.fi-btn-label:has(+ *:contains("Login")),
+.fi-btn-label::after {
+    content: '' !important;
+}
+
+/* Specifically target header action buttons */
+.fi-header-actions .fi-btn-label,
+.fi-ta-actions .fi-btn-label,
+.fi-ac .fi-btn-label {
+    word-spacing: -100px;
+    /* Collapse extra words */
+}

@@ -1,0 +1,49 @@
+<?php
+
+namespace App\Filament\Widgets;
+
+use App\Models\Quotation;
+use App\Models\User;
+use Filament\Widgets\ChartWidget;
+
+class TopSalesUsersChart extends ChartWidget
+{
+    protected ?string $heading = 'Top Sales Users';
+    
+    protected static ?int $sort = 4;
+
+    protected function getData(): array
+    {
+        $data = Quotation::whereIn('status', ['Signed', 'Approved', 'Production', 'Completed'])
+            ->join('projects', 'quotations.project_id', '=', 'projects.id')
+            ->join('customers', 'projects.customer_id', '=', 'customers.id')
+            ->join('users', 'customers.user_id', '=', 'users.id')
+            ->selectRaw('count(quotations.id) as count, users.name')
+            ->groupBy('users.name')
+            ->orderBy('count', 'desc')
+            ->limit(5)
+            ->get();
+
+        return [
+            'datasets' => [
+                [
+                    'label' => 'Quotations',
+                    'data' => $data->pluck('count')->toArray(),
+                    'backgroundColor' => [
+                        '#3b82f6',
+                        '#60a5fa',
+                        '#93c5fd',
+                        '#bfdbfe',
+                        '#dbeafe',
+                    ],
+                ],
+            ],
+            'labels' => $data->pluck('name')->toArray(),
+        ];
+    }
+
+    protected function getType(): string
+    {
+        return 'doughnut';
+    }
+}

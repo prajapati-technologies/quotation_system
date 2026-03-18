@@ -1,0 +1,36 @@
+<?php
+
+namespace App\Filament\Resources\Categories\Schemas;
+
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Schema;
+
+class CategoryForm
+{
+    public static function configure(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                TextInput::make('name')
+                    ->required()
+                    ->maxLength(255),
+                Select::make('brand_id')
+                    ->relationship('brand', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->required(),
+                Select::make('type')
+                    ->options([
+                        'COLOR' => 'Color',
+                        'PRODUCT' => 'Product',
+                        'OTHER' => 'Other',
+                    ])
+                    ->default('COLOR')
+                    ->required(),
+                TextInput::make('sub_category')
+                    ->maxLength(255),
+            ]);
+    }
+}

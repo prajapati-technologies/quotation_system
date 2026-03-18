@@ -1,0 +1,101 @@
+<?php
+
+namespace App\Filament\Widgets;
+
+use App\Models\Quotation;
+use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\ViewAction;
+use Filament\Tables;
+use Filament\Tables\Table;
+use Filament\Widgets\TableWidget as BaseWidget;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Enums\FiltersLayout;
+use App\Models\User;
+use Illuminate\Support\Carbon;
+
+class ProjectsOverview extends BaseWidget
+{
+    protected static ?string $heading = 'Projects Overview';
+
+    protected int | string | array $columnSpan = 'full';
+
+    protected static ?int $sort = 2;
+
+    public function table(Table $table): Table
+    {
+        return $table
+            ->query(
+                Quotation::query()->latest()->limit(10)
+            )
+            ->columns([
+                Tables\Columns\TextColumn::make('project.name')
+                    ->label('Project')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('project.customer.name')
+                    ->label('Customer'),
+                Tables\Columns\TextColumn::make('project.customer.user.name')
+                    ->label('Sales User'),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'Draft' => 'warning',
+                        'Signed' => 'success',
+                        'Approved' => 'info',
+                        'Production' => 'primary',
+                        'Completed' => 'success',
+                        default => 'gray',
+                    }),
+                Tables\Columns\TextColumn::make('final_price')
+                    ->money()
+                    ->label('Amount'),
+            ])
+            ->actions([
+                ActionGroup::make([
+                    ViewAction::make(),
+                    Action::make('pdf')
+                        ->label('PDF')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->color('success')
+                        ->action(fn (Quotation $record) => redirect()->route('quotations.pdf', $record)),
+                ])->label('Action'),
+            ])
+            ->filters([
+                SelectFilter::make('sales_user')
+                    ->label('Sales User')
+                    ->options(User::where('role', 'sales')->pluck('name', 'id'))
+                    ->query(function ($query, array $data) {
+                        if ($data['value']) {
+                            $query->whereHas('project.customer', fn($q) => $q->where('user_id', $data['value']));
+                        }
+                    }),
+                SelectFilter::make('status')
+                    ->options([
+                        'Draft' => 'Draft',
+                        'Signed' => 'Signed',
+                        'Production' => 'Production',
+                        'Completed' => 'Completed',
+                    ]),
+                SelectFilter::make('month')
+                    ->options([
+                        '01' => 'January', '02' => 'February', '03' => 'March', '04' => 'April',
+                        '05' => 'May', '06' => 'June', '07' => 'July', '08' => 'August',
+                        '09' => 'September', '10' => 'October', '11' => 'November', '12' => 'December',
+                    ])
+                    ->query(fn ($query, $data) => $data['value'] ? $query->whereMonth('created_at', $data['value']) : $query),
+                SelectFilter::make('material')
+                    ->label('Material')
+                    ->options([
+                        'uPVC' => 'uPVC',
+                        'Aluminum' => 'Aluminum',
+                        'Wood' => 'Wood',
+                    ])
+                    ->query(function ($query, $data) {
+                        if ($data['value']) {
+                            $query->whereHas('items', fn($q) => $q->where('material', $data['value']));
+                        }
+                    }),
+            ], layout: FiltersLayout::AboveContent)
+            ->filtersFormColumns(4);
+    }
+}

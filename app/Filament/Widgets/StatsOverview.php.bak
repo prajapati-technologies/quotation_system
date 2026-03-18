@@ -1,0 +1,42 @@
+<?php
+
+namespace App\Filament\Widgets;
+
+use App\Models\Customer;
+use App\Models\Quotation;
+use Filament\Widgets\StatsOverviewWidget as BaseWidget;
+use Filament\Widgets\StatsOverviewWidget\Stat;
+
+class StatsOverview extends BaseWidget
+{
+    protected function getStats(): array
+    {
+        $revenue = Quotation::whereIn('status', ['Approved', 'Production', 'Completed'])->sum('final_price');
+        $signedCount = Quotation::where('status', 'Signed')->count();
+        $salesUsersCount = \App\Models\User::where('role', 'sales')->where('is_active', true)->count();
+        $projectsCount = \App\Models\Project::count();
+
+        return [
+            Stat::make('Total Sales Users', $salesUsersCount)
+                ->description('3% increase')
+                ->descriptionIcon('heroicon-m-arrow-trending-up')
+                ->chart([7, 12, 10, 3, 15, 4, 17])
+                ->color('info'),
+            Stat::make('Total Projects', $projectsCount)
+                ->description('12% increase')
+                ->descriptionIcon('heroicon-m-arrow-trending-up')
+                ->chart([15, 4, 10, 2, 12, 4, 12])
+                ->color('primary'),
+            Stat::make('Signed Quotations', $signedCount)
+                ->description('8% increase')
+                ->descriptionIcon('heroicon-m-arrow-trending-up')
+                ->chart([3, 10, 4, 12, 4, 12, 15])
+                ->color('success'),
+            Stat::make('Total Revenue', '$' . number_format($revenue, 2))
+                ->description('24% increase')
+                ->descriptionIcon('heroicon-m-arrow-trending-up')
+                ->chart([10, 4, 15, 2, 12, 4, 10])
+                ->color('success'),
+        ];
+    }
+}
