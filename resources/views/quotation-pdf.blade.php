@@ -5,274 +5,370 @@
     <meta charset="utf-8">
     <title>Quotation #{{ $quotation->id }}</title>
     <style>
+        @page {
+            margin: 1cm;
+        }
+
         body {
             font-family: 'DejaVu Sans', sans-serif;
-            font-size: 12px;
-            color: #222;
+            font-size: 11px;
+            color: #333;
+            line-height: 1.5;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header-container {
+            border-bottom: 2px solid #1a56db;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
         }
 
         .header {
-            text-align: center;
-            margin-bottom: 24px;
-        }
-
-        .header h1 {
-            font-size: 22px;
-            margin: 0;
-            letter-spacing: 2px;
-        }
-
-        .header p {
-            margin: 4px 0 0;
-            color: #555;
-            font-size: 12px;
-        }
-
-        .info {
-            width: 100%;
-            margin-bottom: 18px;
-        }
-
-        .info td {
-            vertical-align: top;
-            padding: 4px 8px;
-            font-size: 12px;
-        }
-
-        .section-title {
-            background-color: #1a56db;
-            color: #fff;
-            font-size: 13px;
-            font-weight: bold;
-            padding: 6px 10px;
-            margin-top: 20px;
-            margin-bottom: 0;
-        }
-
-        .table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 0;
-        }
-
-        .table th {
-            background-color: #e8f0fe;
-            border: 1px solid #c5cfe8;
-            padding: 7px 6px;
-            text-align: left;
-            font-size: 11px;
-            color: #1a3a6b;
-        }
-
-        .table td {
-            border: 1px solid #dde3f0;
-            padding: 7px 6px;
-            vertical-align: top;
-            font-size: 11px;
-        }
-
-        .table tr:nth-child(even) td {
-            background-color: #f7f9ff;
-        }
-
-        .badge {
-            display: inline-block;
-            padding: 2px 7px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: bold;
-        }
-
-        .badge-special { background: #fde68a; color: #78350f; }
-        .badge-normal  { background: #d1fae5; color: #065f46; }
-
-        .total-box {
-            margin-top: 24px;
             text-align: right;
         }
 
-        .total-box table {
-            width: 260px;
+        .header h1 {
+            font-size: 28px;
+            margin: 0;
+            color: #1a56db;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .header p {
+            margin: 2px 0 0;
+            color: #666;
+            font-size: 11px;
+        }
+
+        .info-table {
+            width: 100%;
+            margin-bottom: 25px;
+            border-spacing: 0;
+        }
+
+        .info-table td {
+            vertical-align: top;
+            width: 50%;
+        }
+
+        .info-box {
+            padding: 10px;
+            background-color: #f8fafc;
+            border-radius: 8px;
+            min-height: 100px;
+        }
+
+        .info-box h3 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            color: #64748b;
+            text-transform: uppercase;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 4px;
+        }
+
+        .info-box p {
+            margin: 3px 0;
+            line-height: 1.4;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #1e293b;
+            margin: 25px 0 10px 0;
+            padding-left: 5px;
+            border-left: 4px solid #1a56db;
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 5px;
+        }
+
+        .items-table th {
+            background-color: #f1f5f9;
+            color: #475569;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            padding: 10px 8px;
+            border-bottom: 2px solid #e2e8f0;
+            text-align: left;
+        }
+
+        .items-table td {
+            padding: 12px 8px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: top;
+        }
+
+        .item-details strong {
+            display: block;
+            font-size: 12px;
+            color: #1e293b;
+            margin-bottom: 2px;
+        }
+
+        .item-details span {
+            color: #64748b;
+            font-size: 10px;
+        }
+
+        .drawing-container {
+            width: 80px;
+            height: 80px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .drawing-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .specs-badge {
+            display: inline-block;
+            background-color: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #475569;
+            font-size: 10px;
+            margin-top: 4px;
+        }
+
+        .price-column {
+            text-align: right;
+            font-weight: bold;
+            color: #0f172a;
+            white-space: nowrap;
+        }
+
+        .qty-column {
+            text-align: center;
+            color: #475569;
+        }
+
+        .totals-section {
+            margin-top: 30px;
+            page-break-inside: avoid;
+        }
+
+        .totals-table {
+            width: 280px;
             float: right;
             border-collapse: collapse;
         }
 
-        .total-box table td {
-            padding: 5px 10px;
-            border: 1px solid #dde3f0;
-            font-size: 12px;
+        .totals-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 11px;
         }
 
-        .total-box table tr:last-child td {
-            font-weight: bold;
-            font-size: 14px;
-            background: #e8f0fe;
-            color: #1a3a6b;
+        .totals-table .label {
+            color: #64748b;
+            text-align: right;
         }
 
-        .clearfix::after { content: ''; display: block; clear: both; }
+        .totals-table .value {
+            text-align: right;
+            font-weight: 600;
+            width: 100px;
+        }
 
-        .signature-box {
-            margin-top: 50px;
+        .totals-table .discount {
+            color: #ef4444;
+        }
+
+        .totals-table .grand-total {
+            background-color: #1a56db;
+            color: #ffffff !important;
+            font-size: 15px;
+            font-weight: 800;
+            border-radius: 0 0 8px 8px;
+        }
+
+        .totals-table .grand-total .label {
+            color: #ffffff;
+            opacity: 0.9;
+        }
+
+        .notes-box {
+            margin-top: 40px;
+            padding: 15px;
+            background-color: #fffbeb;
+            border: 1px solid #fef3c7;
+            border-radius: 8px;
+            width: 60%;
+        }
+
+        .notes-box h4 {
+            margin: 0 0 5px 0;
+            color: #92400e;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+
+        .notes-box p {
+            margin: 0;
+            color: #b45309;
+            font-size: 10px;
         }
 
         .footer {
-            margin-top: 30px;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
             text-align: center;
-            font-size: 10px;
-            color: #888;
-            border-top: 1px solid #ddd;
-            padding-top: 8px;
+            padding: 15px 0;
+            border-top: 1px solid #e2e8f0;
+            color: #94a3b8;
+            font-size: 9px;
+        }
+
+        .clearfix::after {
+            content: '';
+            display: block;
+            clear: both;
         }
     </style>
 </head>
 
 <body>
-    <!-- HEADER -->
-    <div class="header">
-        <h1>QUOTATION</h1>
-        <p>Expert Window &amp; Door Solutions</p>
+    <div class="header-container clearfix">
+        <div style="float: left; width: 40%;">
+            @php
+                $logoPath = public_path('images/logo.png');
+            @endphp
+            @if(file_exists($logoPath))
+                <img src="{{ $logoPath }}" style="max-height: 80px; max-width: 100%; object-fit: contain;">
+            @else
+                <div style="font-size: 24px; font-weight: 800; color: #1e293b;">MODA</div>
+            @endif
+        </div>
+        <div class="header" style="float: right; width: 60%;">
+            <h1>QUOTATION</h1>
+            <p>Expert Window &amp; Door Solutions</p>
+        </div>
     </div>
 
-    <!-- INFO TABLE -->
-    <table class="info">
+    <table class="info-table">
         <tr>
-            <td width="50%">
-                <strong>Customer:</strong><br>
-                {{ $quotation->project->customer->name ?? 'N/A' }}<br>
-                {{ $quotation->project->customer->address ?? '' }}<br>
-                @if($quotation->project->customer->mobile)
-                    Mobile: {{ $quotation->project->customer->mobile }}
-                @endif
+            <td style="padding-right: 15px;">
+                <div class="info-box">
+                    <h3>Customer Details</h3>
+                    <p><strong>{{ $quotation->project->customer->name ?? 'N/A' }}</strong></p>
+                    <p>{{ $quotation->project->customer->address ?? '' }}</p>
+                    @if($quotation->project->customer->mobile)
+                        <p>Tel: {{ $quotation->project->customer->mobile }}</p>
+                    @endif
+                </div>
             </td>
             <td>
-                <strong>Quotation Details:</strong><br>
-                Quote #: {{ $quotation->id }}<br>
-                Date: {{ $quotation->quotation_date ? \Carbon\Carbon::parse($quotation->quotation_date)->format('d M Y') : $quotation->created_at->format('d M Y') }}<br>
-                Project: {{ $quotation->project->name ?? 'N/A' }}<br>
-                Status: {{ $quotation->status ?? 'Draft' }}<br>
-                @if($quotation->project->expected_delivery_date)
-                    Delivery: {{ $quotation->project->expected_delivery_date }}
-                @endif
+                <div class="info-box">
+                    <h3>Quotation Info</h3>
+                    <p style="margin-top: 0;"><span style="color: #64748b;">Quotation No:</span> #{{ sprintf('%05d', $quotation->id) }}</p>
+                    <p><span style="color: #64748b;">Date:</span> {{ $quotation->quotation_date ? \Carbon\Carbon::parse($quotation->quotation_date)->format('d M Y') : $quotation->created_at->format('d M Y') }}</p>
+                    <p><span style="color: #64748b;">Project:</span> {{ $quotation->project->name ?? 'N/A' }}</p>
+                    <p><span style="color: #64748b;">Status:</span> {{ $quotation->status ?? 'Draft' }}</p>
+                </div>
             </td>
         </tr>
     </table>
 
-    <!-- LINE ITEMS -->
+    <div class="section-title">Schedule of Line Items</div>
+
     @php
-        // Calculate total area and discount total for summary
-        $totalArea = 0;
+        $goodsGrossTotal = 0;
+        $totalDiscountSum = 0;
         $installationTotal = 0;
 
-        foreach ($quotation->items as $areaItem) {
-            $w = floatval($areaItem->width ?? 0);
-            $h = floatval($areaItem->height ?? 0);
-            $calculatedArea = ($w / 1000) * ($h / 1000);
-            $areaSqm = max($calculatedArea, 1.0); // area per piece in Sqm (min 1)
+        foreach ($quotation->items as $item) {
+            $itemW = floatval($item->width ?? 1);
+            $itemH = floatval($item->height ?? 1);
+            $areaSqm = ($itemW / 1000) * ($itemH / 1000);
+            $itemQty = floatval($item->quantity ?? 1);
+            
+            $discountRate = floatval($item->discount ?? 0);
+            $itemDiscountTotal = ($discountRate * $areaSqm) * $itemQty;
+            $totalDiscountSum += $itemDiscountTotal;
 
-            $qty = floatval($areaItem->quantity ?? 1);
-            $totalArea += $areaSqm * $qty; // total Sqm = area per piece × quantity
+            $itemPrice = floatval($item->price ?? 0);
+            $goodsGrossTotal += ($itemPrice + $itemDiscountTotal);
 
-            // Installation total = per Sqm install fee × total Sqm
-            $installPerSqm = floatval($areaItem->installation_cost ?? 0);
-            $installationTotal += $installPerSqm * $areaSqm * $qty;
+            $installRate = floatval($item->installation_cost ?? 0);
+            $installationTotal += ($installRate * $areaSqm) * $itemQty;
         }
 
-        $discountPerSqm = floatval($quotation->discount ?? 0);
-        $discountTotal = $discountPerSqm * $totalArea;
-
-        // Total after discount but before VAT
-        $preVatTotal = max(0, floatval($quotation->total_price ?? 0) - $discountTotal);
+        $vatPercent = floatval($quotation->vat_percent ?? 0);
+        $vatAmount = floatval($quotation->vat_amount ?? 0);
+        $finalPrice = floatval($quotation->final_price ?? 0);
     @endphp
 
-    <div class="section-title">Line Items</div>
-    <table class="table">
+    <table class="items-table">
         <thead>
             <tr>
-                <th>#</th>
-                <th>Product</th>
-                <th>Drawing</th>
-                <th>Material / Brand / Type</th>
-                <th>Specs (W × H mm)</th>
-                <th>Color / Glass</th>
-                <th>Class</th>
-                <th>Qty</th>
-                <th>Price</th>
+                <th width="30">Item</th>
+                <th width="85" style="text-align:center;">Drawing</th>
+                <th>Description &amp; Specifications</th>
+                <th width="40" style="text-align:center;">Qty</th>
+                <th width="100" style="text-align:right;">Subtotal</th>
             </tr>
         </thead>
         <tbody>
             @foreach($quotation->items as $index => $item)
                 @php
-                    $maxW = 70; $maxH = 70;
-                    $scale = min($maxW / max($item->width, 1), $maxH / max($item->height, 1));
-                    $w = $item->width * $scale;
-                    $h = $item->height * $scale;
+                    $maxW = 75; $maxH = 75;
                 @endphp
                 <tr>
-                    <td>{{ $index + 1 }}</td>
-
-                    {{-- Product Name --}}
-                    <td>
-                        <strong>{{ $item->product->name ?? ($item->product_type ?? 'N/A') }}</strong>
-                    </td>
-
-                    {{-- Drawing / Image --}}
+                    <td style="text-align:center; color: #94a3b8; font-weight: bold;">{{ sprintf('%02d', $index + 1) }}</td>
+                    
                     <td style="text-align:center;">
-                        @if($item->product && $item->product->drawing_path)
-                            <img src="{{ public_path('storage/' . $item->product->drawing_path) }}"
-                                 width="{{ $maxW }}" height="{{ $maxH }}"
-                                 style="object-fit:contain; border:1px solid #ddd;">
-                        @else
-                            <svg width="{{ $maxW }}" height="{{ $maxH }}">
-                                <rect x="{{ ($maxW - $w) / 2 }}" y="{{ ($maxH - $h) / 2 }}"
-                                      width="{{ $w }}" height="{{ $h }}"
-                                      fill="none" stroke="#333" stroke-width="2" />
-                                @if(($item->product->name ?? $item->product_type ?? '') === 'Window')
-                                    <line x1="{{ $maxW / 2 }}" y1="{{ ($maxH - $h) / 2 }}"
-                                          x2="{{ $maxW / 2 }}" y2="{{ ($maxH + $h) / 2 }}"
-                                          stroke="#333" stroke-width="1" />
-                                @endif
-                            </svg>
-                        @endif
+                        <div class="drawing-container">
+                            @php
+                                $imgPath = $item->product->drawing_path ?? null;
+                                $fullPath = $imgPath ? public_path('storage/' . $imgPath) : null;
+                            @endphp
+                            @if($fullPath && file_exists($fullPath))
+                                <img src="{{ $fullPath }}">
+                            @else
+                                <div style="font-size: 8px; color:#cbd5e1; padding: 10px;">NO IMAGE</div>
+                            @endif
+                        </div>
                     </td>
 
-                    {{-- Material / Brand / Type --}}
-                    <td>
-                        {{ $item->material->name ?? 'N/A' }}<br>
-                        <small style="color:#555;">
-                            Brand: {{ $item->brand->name ?? 'N/A' }}<br>
-                            Type: {{ $item->materialType->name ?? 'N/A' }}
-                        </small>
+                    <td class="item-details">
+                        <strong>{{ $item->product->name ?? ($item->product_type ?? 'N/A') }}</strong>
+                        <span>
+                            {{ $item->brand->name ?? '' }} Series — {{ $item->materialType->name ?? '' }}
+                        </span>
+                        <div style="margin-top: 6px;">
+                            <span style="display: block; margin-bottom: 2px;">
+                                <i style="color: #94a3b8;">Color:</i> {{ $item->color->name ?? 'N/A' }} | 
+                                <i style="color: #94a3b8;">Glass:</i> {{ $item->glass->name ?? 'N/A' }}
+                            </span>
+                            <div class="specs-badge">
+                                {{ number_format($item->width, 0) }}mm (W) × {{ number_format($item->height, 0) }}mm (H)
+                            </div>
+                        </div>
                     </td>
 
-                    {{-- Specs --}}
-                    <td style="white-space:nowrap;">
-                        {{ number_format($item->width, 0) }} × {{ number_format($item->height, 0) }}
+                    <td class="qty-column">
+                        {{ $item->quantity }}
                     </td>
 
-                    {{-- Color / Glass / Film --}}
-                    <td>
-                        <small>
-                            Color: {{ $item->color->name ?? 'N/A' }}<br>
-                            Glass: {{ $item->glass->name ?? 'N/A' }}<br>
-                            Film: {{ $item->glassFilm->name ?? 'N/A' }}
-                        </small>
-                    </td>
-
-                    {{-- Classification --}}
-                    <td>
-                        @if(($item->classification ?? '') === 'SPECIAL')
-                            <span class="badge badge-special">SPECIAL</span>
-                        @else
-                            <span class="badge badge-normal">NORMAL</span>
-                        @endif
-                    </td>
-
-                    {{-- Qty --}}
-                    <td style="text-align:center;">{{ $item->quantity }}</td>
-
-                    {{-- Price --}}
-                    <td style="text-align:right; white-space:nowrap;">
+                    <td class="price-column">
                         ฿{{ number_format($item->price, 2) }}
                     </td>
                 </tr>
@@ -280,36 +376,47 @@
         </tbody>
     </table>
 
-    <!-- TOTALS -->
-    <div class="total-box clearfix">
-        <table>
+    <div class="totals-section clearfix">
+        <table class="totals-table">
             <tr>
-                <td>Total</td>
-                <td style="text-align:right;">฿{{ number_format($quotation->total_price, 2) }}</td>
+                <td class="label">Product Subtotal</td>
+                <td class="value">฿{{ number_format($goodsGrossTotal, 2) }}</td>
+            </tr>
+            @if($totalDiscountSum > 0)
+            <tr>
+                <td class="label discount">Discount</td>
+                <td class="value discount">- ฿{{ number_format($totalDiscountSum, 2) }}</td>
+            </tr>
+            @endif
+            <tr>
+                <td class="label">Installation</td>
+                <td class="value">฿{{ number_format($installationTotal, 2) }}</td>
             </tr>
             <tr>
-                <td>Discount</td>
-                <td style="text-align:right;">- ฿{{ number_format($discountTotal, 2) }}</td>
+                <td class="label">VAT ({{ number_format($vatPercent, 1) }}%)</td>
+                <td class="value">฿{{ number_format($vatAmount, 2) }}</td>
             </tr>
-            <tr>
-                <td>Install Price</td>
-                <td style="text-align:right;">฿{{ number_format($installationTotal, 2) }}</td>
-            </tr>
-            <tr>
-                <td>VAT ({{ number_format($quotation->vat_percent ?? 0, 2) }}%)</td>
-                <td style="text-align:right;">฿{{ number_format($quotation->vat_amount ?? 0, 2) }}</td>
-            </tr>
-            <tr>
-                <td><strong>Grand Total</strong></td>
-                <td style="text-align:right;"><strong>฿{{ number_format($quotation->final_price, 2) }}</strong></td>
+            <tr class="grand-total">
+                <td class="label" style="border-bottom: none;">Grand Total</td>
+                <td class="value" style="border-bottom: none;">฿{{ number_format($finalPrice, 2) }}</td>
             </tr>
         </table>
     </div>
 
-    <!-- FOOTER -->
+    @if($quotation->notes)
+        <div class="notes-box">
+            <h4>Important Notes / Remarks:</h4>
+            <p>{{ $quotation->notes }}</p>
+        </div>
+    @endif
+
     <div class="footer">
-        Generated on {{ now()->format('d M Y, h:i A') }} &nbsp;|&nbsp; Expert Window &amp; Door Solutions
+        <p>This is a computer generated quotation. Valid for 30 days from issued date.</p>
+        <p>© {{ date('Y') }} Expert Window &amp; Door Solutions | All Rights Reserved</p>
     </div>
+</body>
+
+</html>
 </body>
 
 </html>

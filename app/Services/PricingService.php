@@ -22,12 +22,9 @@ class PricingService
         $height = floatval($data['height'] ?? 0);
 
         // Area in Sqm (mm -> m, then m²)
-        $calculatedArea = ($width / 1000) * ($height / 1000);
+        $area = ($width / 1000) * ($height / 1000);
 
-        // Minimum Area Logic (Standard 1.0 Sqm)
-        $area = max($calculatedArea, 1.0);
-
-        $details['calculated_area_sqm'] = number_format($calculatedArea, 3);
+        $details['calculated_area_sqm'] = number_format($area, 3);
         $details['applied_area_sqm'] = number_format($area, 3);
 
         // 1. Base Price (Brand Rate) - NOW AREA BASED
@@ -108,7 +105,8 @@ class PricingService
 
         // Final unit price and total price
         // Core rule: item_total = area * rate_per_sqm
-        $ratePerSqm = round($ratePerSqm, 4);
+        $goodsRatePerSqm = $ratePerSqm - $finalInstallation;
+        
         $unitPrice = $area * $ratePerSqm;
 
         $quantity = intval($data['quantity'] ?? 1);
@@ -120,6 +118,8 @@ class PricingService
         return [
             'unit_price' => $unitPrice,
             'total_price' => $total,
+            'goods_rate_per_sqm' => $goodsRatePerSqm,
+            'installation_rate_per_sqm' => $finalInstallation,
             'details' => $details,
             'calculated_installation' => $installation,
         ];

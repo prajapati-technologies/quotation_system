@@ -123,8 +123,13 @@ class QuotationInfolist
                                     ->formatStateUsing(fn($record) => $record->glass->name ?? 'N/A')
                                     ->disabled(),
 
+                                 TextInput::make('discount')
+                                    ->label('Discount (per Sqm)')
+                                    ->prefix('฿')
+                                    ->disabled(),
+
                                 TextInput::make('price')
-                                    ->label('Item Total')
+                                    ->label('Item Total (Net)')
                                     ->prefix('฿')
                                     ->columnSpanFull()
                                     ->extraAttributes(['class' => 'font-bold text-green-600'])
@@ -139,17 +144,30 @@ class QuotationInfolist
                     ->columnSpanFull()
                     ->columns(2)
                     ->schema([
-                        Placeholder::make('total_price')
-                            ->label('Subtotal (Main Amount)')
-                            ->content(fn($record) => '฿' . number_format($record->total_price, 2)),
+                        Placeholder::make('total_goods')
+                            ->label('Goods Total')
+                            ->content(fn($record) => '฿' . number_format($record->total_goods ?? 0, 2)),
 
                         Placeholder::make('discount')
-                            ->label('Discount')
+                            ->label('Total Discount')
                             ->content(fn($record) => '฿' . number_format($record->discount ?? 0, 2)),
 
-                        Placeholder::make('final_price')
+                        Placeholder::make('installation_total')
+                            ->label('Installation Total')
+                            ->content(fn($record) => '฿' . number_format($record->installation_total ?? 0, 2)),
+
+                        Placeholder::make('total_price')
+                            ->label('Subtotal (Before VAT)')
+                            ->content(fn($record) => '฿' . number_format($record->total_price, 2)),
+
+                        Placeholder::make('vat_amount')
+                            ->label(fn($record) => "VAT (" . ($record->vat_percent ?? 0) . "%)")
+                            ->content(fn($record) => '฿' . number_format($record->vat_amount ?? 0, 2)),
+
+                         Placeholder::make('final_price')
                             ->label('Grand Total')
-                            ->content(fn($record) => new HtmlString("<div class='text-4xl font-extrabold text-primary-600 uppercase tracking-tight'>$" . number_format($record->final_price, 2) . "</div>")),
+                            ->columnSpanFull()
+                            ->content(fn($record) => new HtmlString("<div class='text-4xl font-extrabold text-primary-600 uppercase tracking-tight text-right'>฿" . number_format($record->final_price, 2) . "</div>")),
                     ]),
             ]);
     }

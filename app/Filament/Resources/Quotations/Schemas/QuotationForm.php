@@ -118,10 +118,11 @@ class QuotationForm
                             ->required()
                             ->live()
                             ->prefixIcon('heroicon-o-cube-transparent')
-                            ->afterStateUpdated(function (callable $set) {
+                            ->afterStateUpdated(function (callable $set, callable $get) {
                                 $set('material_type_id', null);
                                 $set('brand_id', null);
                                 $set('product_id', null);
+                                self::updatePrices($set, $get);
                             }),
 
                         Select::make('material_type_id')
@@ -129,7 +130,8 @@ class QuotationForm
                             ->options(fn(callable $get) => MaterialType::where('material_id', $get('material_id'))->pluck('name', 'id'))
                             ->required()
                             ->live()
-                            ->visible(fn(callable $get) => filled($get('material_id'))),
+                            ->visible(fn(callable $get) => filled($get('material_id')))
+                            ->afterStateUpdated(fn(callable $set, callable $get) => self::updatePrices($set, $get)),
 
                         Select::make('brand_id')
                             ->label('Brand')
@@ -137,8 +139,9 @@ class QuotationForm
                             ->required()
                             ->live()
                             ->visible(fn(callable $get) => filled($get('material_type_id')))
-                            ->afterStateUpdated(function (callable $set) {
+                            ->afterStateUpdated(function (callable $set, callable $get) {
                                 $set('product_id', null);
+                                self::updatePrices($set, $get);
                             }),
 
                         Select::make('product_id')
@@ -146,6 +149,8 @@ class QuotationForm
                             ->options(fn(callable $get) => Product::whereHas('brandRates', fn($q) => $q->where('brand_id', $get('brand_id')))->pluck('name', 'id'))
                             ->required()
                             ->live()
+                            ->searchable()
+                            ->preload()
                             ->visible(fn(callable $get) => filled($get('brand_id')))
                             ->afterStateUpdated(fn(callable $set, callable $get) => self::updatePrices($set, $get)),
 
@@ -191,6 +196,7 @@ class QuotationForm
                         TextInput::make('width')
                             ->label('Width (mm)')
                             ->numeric()
+                            ->default(1000)
                             ->required()
                             ->live()
                             ->afterStateUpdated(fn(callable $set, callable $get) => self::updatePrices($set, $get)),
@@ -198,6 +204,7 @@ class QuotationForm
                         TextInput::make('height')
                             ->label('Height (mm)')
                             ->numeric()
+                            ->default(1000)
                             ->required()
                             ->live()
                             ->afterStateUpdated(fn(callable $set, callable $get) => self::updatePrices($set, $get)),
@@ -316,6 +323,17 @@ class QuotationForm
                             ->default(0)
                             ->live()
                             ->afterStateUpdated(fn(callable $set, callable $get) => self::updatePrices($set, $get)),
+
+                        TextInput::make('discount')
+                            ->label('Discount (per Sqm)')
+                            ->numeric()
+                            ->default(0)
+                            ->minValue(0)
+                            ->live()
+                            ->prefix('฿')
+                            ->placeholder('0')
+                            ->afterStateUpdated(fn(callable $set, callable $get) => self::updatePrices($set, $get)),
+
                         TextInput::make('price')
                             ->label('Item Total')
                             ->numeric()
@@ -335,23 +353,33 @@ class QuotationForm
                     ->schema([
                         Grid::make(2)
                             ->schema([
-                                TextInput::make('total_price')
-                                    ->label('Subtotal (Main Amount)')
+                                TextInput::make('total_goods')
+                                    ->label('Goods Total')
                                     ->readOnly()
-                                    ->dehydrated()
+                                    ->dehydrated(false)
                                     ->prefix('฿')
                                     ->extraAttributes(['class' => 'text-right text-lg']),
 
-                                TextInput::make('discount')
-                                    ->label('Discount per Sqm (฿/Sqm)')
-                                    ->numeric()
-                                    ->default(0)
-                                    ->minValue(0)
-                                    ->live()
+                                TextInput::make('installation_total')
+                                    ->label('Installation Total')
+                                    ->readOnly()
+                                    ->dehydrated(false)
                                     ->prefix('฿')
-                                    ->placeholder('0')
-                                    ->helperText('Total discount = Total Area (Sqm) × rate')
-                                    ->afterStateUpdated(fn(callable $set, callable $get) => self::updatePrices($set, $get)),
+                                    ->extraAttributes(['class' => 'text-right text-lg text-primary-600']),
+
+                                TextInput::make('total_price')
+                                    ->label('Subtotal (Before VAT)')
+                                    ->readOnly()
+                                    ->dehydrated()
+                                    ->prefix('฿')
+                                    ->extraAttributes(['class' => 'text-right bg-blue-50']),
+
+                                TextInput::make('discount')
+                                    ->label('Total Discount')
+                                    ->readOnly()
+                                    ->dehydrated()
+                                    ->prefix('฿')
+                                    ->extraAttributes(['class' => 'text-right']),
 
                                 TextInput::make('vat_percent')
                                     ->label('VAT (%)')
@@ -385,79 +413,83 @@ class QuotationForm
 
     public static function updatePrices(callable $set, callable $get)
     {
-        // Check for items at root level first
-        $items = $get('items');
+        // Try to find the items at different relative paths
+        $items = $get('items') ?? $get('../items') ?? $get('../../items') ?? $get('../../../items');
+        
         $rootPrefix = '';
-
-        // If not found, check 2 levels up (common for repeater items)
-        if (!is_array($items)) {
-            $items = $get('../../items');
+        if ($get('items') !== null) {
+            $rootPrefix = '';
+        } elseif ($get('../items') !== null) {
+            $rootPrefix = '../';
+        } elseif ($get('../../items') !== null) {
             $rootPrefix = '../../';
-        }
-
-        // If still not found, check 3 levels up
-        if (!is_array($items)) {
-            $items = $get('../../../items');
+        } elseif ($get('../../../items') !== null) {
             $rootPrefix = '../../../';
         }
 
-        // Fallback or empty
         if (!is_array($items)) {
             $items = [];
         }
 
-        $total = 0;
-        $totalArea = 0;
-        $installationTotal = 0;
+        $totalGoodsAmount = 0;
+        $totalInstallationAmount = 0;
+        $totalDiscountAmountSum = 0;
         $service = new PricingService();
 
-        // Calculate all item prices
+        // Formula Implementation per Item
         foreach ($items as $key => $item) {
             $calculation = $service->calculateItemPrice($item);
-            $itemPrice = $calculation['total_price'];
+            
+            // 1. Area = (Width ÷ 1000) × (Height ÷ 1000)
+            $area = floatval(str_replace(',', '', $calculation['details']['applied_area_sqm'] ?? 0));
+            $qty = intval($item['quantity'] ?? 1);
+            
+            // 2. Base Amount = Rate × Area × Qty (Product/Goods Rate)
+            $goodsRate = floatval($calculation['goods_rate_per_sqm'] ?? 0);
+            $baseAmount = $goodsRate * $area * $qty;
 
-            // Set item price using the correct relative path to root -> items
-            // We use dot notation for the nested structure of the repeater state
-            $set("{$rootPrefix}items.{$key}.price", number_format($itemPrice, 2, '.', ''));
-            // Set default installation cost only if user has not overridden it
-            $currentInstallation = $item['installation_cost'] ?? null;
-            if ($currentInstallation === null || $currentInstallation === '') {
+            // 3. Discount Total = Discount × Area × Qty
+            $discountRate = floatval($item['discount'] ?? 0);
+            $discountTotalLine = ($discountRate * $area) * $qty;
+
+            // 4. Item Total (Goods Only) = Base Amount − Discount Total
+            // Note: Installation is excluded from "Item Total" as per request.
+            $itemTotalGoods = max(0, $baseAmount - $discountTotalLine);
+
+            // 5. Installation Total = Installation (per Sqm) × Area × Qty
+            $installRate = floatval($calculation['installation_rate_per_sqm'] ?? 0);
+            $installationTotalLine = $installRate * $area * $qty;
+
+            // 6. Final stored price for this item (excluding installation as requested)
+            $set("{$rootPrefix}items.{$key}.price", number_format($itemTotalGoods, 2, '.', ''));
+            $set("{$rootPrefix}items.{$key}.area", $calculation['details']['applied_area_sqm']);
+            
+            // Set default installation cost ONLY if not already set by user manually
+            if (!isset($item['installation_cost']) || $item['installation_cost'] === '') {
                 $set("{$rootPrefix}items.{$key}.installation_cost", $calculation['calculated_installation']);
             }
-            $set("{$rootPrefix}items.{$key}.area", $calculation['details']['applied_area_sqm']);
 
-            $total += $itemPrice;
-
-            // Sum total applied area (Sqm) across all items
-            $itemArea = floatval(str_replace(',', '', $calculation['details']['applied_area_sqm'] ?? 0));
-            $totalArea += $itemArea;
-
-            // Installation total = per Sqm install fee × total Sqm (per item)
-            $installPerSqm = floatval($item['installation_cost'] ?? 0);
-            $installationTotal += $installPerSqm * $itemArea;
+            $totalGoodsAmount += $itemTotalGoods;
+            $totalInstallationAmount += $installationTotalLine;
+            $totalDiscountAmountSum += $discountTotalLine;
         }
 
-        $formattedTotal = number_format($total, 2, '.', '');
-
-        // Discount per Sqm
-        $discountPerSqm = floatval($get("{$rootPrefix}discount") ?? 0);
-        $totalDiscount = $discountPerSqm * $totalArea;
-        $totalDiscount = min($totalDiscount, $total); // subtotal se zyada na ho
-
-        // VAT after discount (installation amount not taxed here)
-        $taxBase = max(0, $total - $totalDiscount);
+        // Global Totals (7 & 8)
         $vatPercent = floatval($get("{$rootPrefix}vat_percent") ?? 0);
-        $vatAmount = $taxBase * $vatPercent / 100;
+        
+        // 7. VAT Amount = (Goods + Installation) × (VAT ÷ 100)
+        $totalTaxableAmount = $totalGoodsAmount + $totalInstallationAmount;
+        $vatAmount = $totalTaxableAmount * ($vatPercent / 100);
 
-        // Grand total includes installation charge
-        $finalTotal = $taxBase + $vatAmount + $installationTotal;
+        // 8. Grand Total = Goods + Installation + VAT Amount
+        $grandTotal = $totalTaxableAmount + $vatAmount;
 
-        $formattedVat = number_format($vatAmount, 2, '.', '');
-        $formattedFinal = number_format($finalTotal, 2, '.', '');
-
-        // Set totals at the root level using the discovered prefix
-        $set("{$rootPrefix}total_price", $formattedTotal);
-        $set("{$rootPrefix}vat_amount", $formattedVat);
-        $set("{$rootPrefix}final_price", $formattedFinal);
+        // Set totals at the root level
+        $set("{$rootPrefix}total_goods", number_format($totalGoodsAmount, 2, '.', ''));
+        $set("{$rootPrefix}installation_total", number_format($totalInstallationAmount, 2, '.', ''));
+        $set("{$rootPrefix}total_price", number_format($totalTaxableAmount, 2, '.', ''));
+        $set("{$rootPrefix}discount", number_format($totalDiscountAmountSum, 2, '.', ''));
+        $set("{$rootPrefix}vat_amount", number_format($vatAmount, 2, '.', ''));
+        $set("{$rootPrefix}final_price", number_format($grandTotal, 2, '.', ''));
     }
 }
