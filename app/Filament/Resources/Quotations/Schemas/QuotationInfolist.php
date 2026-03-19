@@ -124,7 +124,7 @@ class QuotationInfolist
                                     ->disabled(),
 
                                  TextInput::make('discount')
-                                    ->label('Discount (per Sqm)')
+                                    ->label('Discount (Fixed or %)')
                                     ->prefix('฿')
                                     ->disabled(),
 

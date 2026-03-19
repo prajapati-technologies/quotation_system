@@ -325,13 +325,10 @@ class QuotationForm
                             ->afterStateUpdated(fn(callable $set, callable $get) => self::updatePrices($set, $get)),
 
                         TextInput::make('discount')
-                            ->label('Discount (per Sqm)')
-                            ->numeric()
-                            ->default(0)
-                            ->minValue(0)
+                            ->label('Discount (Fixed or %)')
+                            ->placeholder('e.g. 500 or 10%')
                             ->live()
                             ->prefix('฿')
-                            ->placeholder('0')
                             ->afterStateUpdated(fn(callable $set, callable $get) => self::updatePrices($set, $get)),
 
                         TextInput::make('price')
@@ -448,9 +445,18 @@ class QuotationForm
             $goodsRate = floatval($calculation['goods_rate_per_sqm'] ?? 0);
             $baseAmount = $goodsRate * $area * $qty;
 
-            // 3. Discount Total = Discount × Area × Qty
-            $discountRate = floatval($item['discount'] ?? 0);
-            $discountTotalLine = ($discountRate * $area) * $qty;
+            // 3. Discount Total calculation
+            $discountInput = trim($item['discount'] ?? '0');
+            $discountTotalLine = 0;
+
+            if (is_string($discountInput) && str_contains($discountInput, '%')) {
+                $percentage = floatval(str_replace('%', '', $discountInput));
+                // Percentage applied to base amount (Goods Rate * Area * Quantity)
+                $discountTotalLine = ($baseAmount * $percentage) / 100;
+            } else {
+                $discountRate = floatval($discountInput);
+                $discountTotalLine = ($discountRate * $area) * $qty;
+            }
 
             // 4. Item Total (Goods Only) = Base Amount − Discount Total
             // Note: Installation is excluded from "Item Total" as per request.

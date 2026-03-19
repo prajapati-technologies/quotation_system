@@ -300,8 +300,26 @@
             $areaSqm = ($itemW / 1000) * ($itemH / 1000);
             $itemQty = floatval($item->quantity ?? 1);
             
-            $discountRate = floatval($item->discount ?? 0);
-            $itemDiscountTotal = ($discountRate * $areaSqm) * $itemQty;
+            $discountInput = $item->discount ?? '0';
+            $itemDiscountTotal = 0;
+            $itemPrice = floatval($item->price ?? 0);
+
+            if (is_string($discountInput) && strpos($discountInput, '%') !== false) {
+                $percentage = floatval(str_replace('%', '', $discountInput));
+                if ($percentage < 100) {
+                    // Logic: BaseAmount = itemPrice / (1 - percentage)
+                    // DiscountTotal = BaseAmount * percentage
+                    $itemDiscountTotal = ($itemPrice / (1 - ($percentage / 100))) * ($percentage / 100);
+                } else {
+                    // 100% or more discount means the base total is ambiguous if price is 0,
+                    // but we can assume price is 0 and base total was whatever it was.
+                    // However, we don't store BaseAmount. This is a limitation of not storing the formula.
+                    $itemDiscountTotal = 0; 
+                }
+            } else {
+                $discountRate = floatval($discountInput);
+                $itemDiscountTotal = ($discountRate * $areaSqm) * $itemQty;
+            }
             $totalDiscountSum += $itemDiscountTotal;
 
             $itemPrice = floatval($item->price ?? 0);
