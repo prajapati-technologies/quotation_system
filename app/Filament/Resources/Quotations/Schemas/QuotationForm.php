@@ -36,8 +36,16 @@ class QuotationForm
                     ->maxWidth(\Filament\Support\Enums\Width::Full)
                     ->columnSpanFull()
                     ->schema([
-                        Grid::make(['default' => 1, 'sm' => 2, 'lg' => 4])
+                        Grid::make(['default' => 1, 'sm' => 2, 'lg' => 5])
                             ->schema([
+                                Placeholder::make('quotation_number')
+                                    ->label('Quotation No')
+                                    ->content(fn($record) => $record?->quotation_number ?? 'NEW'),
+
+                                Placeholder::make('customer_number')
+                                    ->label('Customer No')
+                                    ->content(fn($get) => \App\Models\Customer::find($get('customer_id'))?->customer_number ?? 'N/A'),
+
                                 Select::make('customer_id')
                                     ->relationship('customer', 'name')
                                     ->searchable()
@@ -325,10 +333,14 @@ class QuotationForm
                             ->afterStateUpdated(fn(callable $set, callable $get) => self::updatePrices($set, $get)),
 
                         TextInput::make('discount')
-                            ->label('Discount (Fixed or %)')
-                            ->placeholder('e.g. 500 or 10%')
+                            ->label('Discount (%)')
+                            ->placeholder('0')
+                            ->numeric()
+                            ->default(0)
+                            ->minValue(0)
+                            ->maxValue(100)
                             ->live()
-                            ->prefix('฿')
+                            ->suffix('%')
                             ->afterStateUpdated(fn(callable $set, callable $get) => self::updatePrices($set, $get)),
 
                         TextInput::make('price')
@@ -445,18 +457,9 @@ class QuotationForm
             $goodsRate = floatval($calculation['goods_rate_per_sqm'] ?? 0);
             $baseAmount = $goodsRate * $area * $qty;
 
-            // 3. Discount Total calculation
-            $discountInput = trim($item['discount'] ?? '0');
-            $discountTotalLine = 0;
-
-            if (is_string($discountInput) && str_contains($discountInput, '%')) {
-                $percentage = floatval(str_replace('%', '', $discountInput));
-                // Percentage applied to base amount (Goods Rate * Area * Quantity)
-                $discountTotalLine = ($baseAmount * $percentage) / 100;
-            } else {
-                $discountRate = floatval($discountInput);
-                $discountTotalLine = ($discountRate * $area) * $qty;
-            }
+            // 3. Discount Total calculation (Always Percentage now)
+            $discountPercentage = floatval($item['discount'] ?? 0);
+            $discountTotalLine = ($baseAmount * $discountPercentage) / 100;
 
             // 4. Item Total (Goods Only) = Base Amount − Discount Total
             // Note: Installation is excluded from "Item Total" as per request.

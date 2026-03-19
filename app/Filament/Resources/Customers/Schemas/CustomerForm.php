@@ -12,6 +12,11 @@ class CustomerForm
     {
         return $schema
             ->components([
+                \Filament\Forms\Components\Placeholder::make('customer_number')
+                    ->label('Customer ID')
+                    ->content(fn ($record) => $record?->customer_number ?? 'NEW')
+                    ->columnSpanFull(),
+
                 TextInput::make('name')
                     ->label('Customer Name')
                     ->placeholder('Enter full name')

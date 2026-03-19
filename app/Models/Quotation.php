@@ -45,4 +45,9 @@ class Quotation extends Model
     {
         return $this->items->sum('price');
     }
+
+    public function getQuotationNumberAttribute()
+    {
+        return 'QT' . str_pad($this->id, 4, '0', STR_PAD_LEFT);
+    }
 }

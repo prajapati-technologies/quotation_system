@@ -19,6 +19,12 @@ class QuotationsTable
         return $table
             ->actionsColumnLabel('Action')
             ->columns([
+                TextColumn::make('quotation_number')
+                    ->label('Quotation No')
+                    ->searchable()
+                    ->sortable()
+                    ->weight(FontWeight::Bold),
+
                 TextColumn::make('project.name')
                     ->label('Project')
                     ->searchable()

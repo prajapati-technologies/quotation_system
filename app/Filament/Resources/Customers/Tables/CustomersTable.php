@@ -18,6 +18,12 @@ class CustomersTable
     {
         return $table
             ->columns([
+                TextColumn::make('customer_number')
+                    ->label('Customer ID')
+                    ->searchable()
+                    ->sortable()
+                    ->weight(FontWeight::Bold),
+
                 TextColumn::make('name')
                     ->label('Customer Name')
                     ->searchable()

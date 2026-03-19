@@ -252,14 +252,15 @@
                 $logoPath = public_path('images/logo.png');
             @endphp
             @if(file_exists($logoPath))
-                <img src="{{ $logoPath }}" style="max-height: 80px; max-width: 100%; object-fit: contain;">
+                <img src="{{ $logoPath }}" style="max-height: 100px; max-width: 100%; object-fit: contain;">
             @else
-                <div style="font-size: 24px; font-weight: 800; color: #1e293b;">MODA</div>
+                <div style="font-size: 32px; font-weight: 800; color: #1e293b; letter-spacing: -1px;">MODA</div>
+                <div style="font-size: 10px; color: #64748b; margin-top: -5px; text-transform: uppercase; letter-spacing: 2px;">Windows & Doors</div>
             @endif
         </div>
         <div class="header" style="float: right; width: 60%;">
-            <h1>QUOTATION</h1>
-            <p>Expert Window &amp; Door Solutions</p>
+            <h1 style="margin-bottom: 5px;">QUOTATION</h1>
+            <p style="color: #64748b;">Premium Window & Door Solutions</p>
         </div>
     </div>
 
@@ -278,7 +279,7 @@
             <td>
                 <div class="info-box">
                     <h3>Quotation Info</h3>
-                    <p style="margin-top: 0;"><span style="color: #64748b;">Quotation No:</span> #{{ sprintf('%05d', $quotation->id) }}</p>
+                    <p style="margin-top: 0;"><span style="color: #64748b;">Quotation/Customer No:</span> {{ $quotation->quotation_number }}/{{ $quotation->project->customer->customer_number ?? 'N/A' }}</p>
                     <p><span style="color: #64748b;">Date:</span> {{ $quotation->quotation_date ? \Carbon\Carbon::parse($quotation->quotation_date)->format('d M Y') : $quotation->created_at->format('d M Y') }}</p>
                     <p><span style="color: #64748b;">Project:</span> {{ $quotation->project->name ?? 'N/A' }}</p>
                     <p><span style="color: #64748b;">Status:</span> {{ $quotation->status ?? 'Draft' }}</p>
@@ -300,25 +301,15 @@
             $areaSqm = ($itemW / 1000) * ($itemH / 1000);
             $itemQty = floatval($item->quantity ?? 1);
             
-            $discountInput = $item->discount ?? '0';
-            $itemDiscountTotal = 0;
+            $percentage = floatval($item->discount ?? 0);
             $itemPrice = floatval($item->price ?? 0);
-
-            if (is_string($discountInput) && strpos($discountInput, '%') !== false) {
-                $percentage = floatval(str_replace('%', '', $discountInput));
-                if ($percentage < 100) {
-                    // Logic: BaseAmount = itemPrice / (1 - percentage)
-                    // DiscountTotal = BaseAmount * percentage
-                    $itemDiscountTotal = ($itemPrice / (1 - ($percentage / 100))) * ($percentage / 100);
-                } else {
-                    // 100% or more discount means the base total is ambiguous if price is 0,
-                    // but we can assume price is 0 and base total was whatever it was.
-                    // However, we don't store BaseAmount. This is a limitation of not storing the formula.
-                    $itemDiscountTotal = 0; 
-                }
+            
+            if ($percentage > 0 && $percentage < 100) {
+                // Since itemPrice = BaseAmount * (1 - p/100)
+                // itemDiscountTotal = BaseAmount * (p/100)
+                $itemDiscountTotal = ($itemPrice / (1 - ($percentage / 100))) * ($percentage / 100);
             } else {
-                $discountRate = floatval($discountInput);
-                $itemDiscountTotal = ($discountRate * $areaSqm) * $itemQty;
+                $itemDiscountTotal = 0;
             }
             $totalDiscountSum += $itemDiscountTotal;
 

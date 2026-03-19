@@ -22,8 +22,16 @@ class QuotationInfolist
                     ->icon('heroicon-o-document-text')
                     ->maxWidth(Width::Full)
                     ->columnSpanFull()
-                    ->columns(['default' => 1, 'sm' => 2, 'lg' => 4])
+                    ->columns(['default' => 1, 'sm' => 2, 'lg' => 3])
                     ->schema([
+                        Placeholder::make('quotation_number')
+                            ->label('Quotation No')
+                            ->content(fn($record) => $record->quotation_number),
+
+                        Placeholder::make('customer_number')
+                            ->label('Customer No')
+                            ->content(fn($record) => $record->customer->customer_number ?? 'N/A'),
+
                         Placeholder::make('customer')
                             ->label('Customer')
                             ->content(fn($record) => $record->customer->name ?? 'N/A'),
@@ -124,8 +132,8 @@ class QuotationInfolist
                                     ->disabled(),
 
                                  TextInput::make('discount')
-                                    ->label('Discount (Fixed or %)')
-                                    ->prefix('฿')
+                                    ->label('Discount (%)')
+                                    ->suffix('%')
                                     ->disabled(),
 
                                 TextInput::make('price')
