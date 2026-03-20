@@ -19,6 +19,7 @@ class ProductForm
             ->components([
                 Section::make('General Information')
                     ->icon('heroicon-o-pencil-square')
+                    ->columns(1) // Force 1 column for the section
                     ->schema([
                         TextInput::make('name')
                             ->label('Product Name')
@@ -60,12 +61,13 @@ class ProductForm
                 Section::make('Available Colors & Pricing')
                     ->icon('heroicon-o-swatch')
                     ->description('Set individual prices for each color.')
+                    ->columns(1) // Force 1 column for the section
                     ->schema([
                         Repeater::make('colorPrices')
                             ->relationship('colorPrices')
                             ->label('Configurations')
+                            ->columns(1) // Force 1 column inside the repeater
                             ->schema([
-                                // All fields vertical (one after another)
                                 Select::make('main_color_id')
                                     ->label('Main Color')
                                     ->options(\App\Models\Color::pluck('name', 'id'))
@@ -102,6 +104,7 @@ class ProductForm
 
                 Section::make('Visual Assets')
                     ->icon('heroicon-o-camera')
+                    ->columns(1) // Force 1 column
                     ->schema([
                         FileUpload::make('drawing_path')
                             ->label('Product Drawing / Image')
