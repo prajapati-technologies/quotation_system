@@ -9,7 +9,8 @@ use Filament\Forms\Components\Repeater;
 use Filament\Schemas\Schema;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\Wizard;
+use Filament\Schemas\Components\Wizard\Step;
 
 class ProductForm
 {
@@ -17,112 +18,139 @@ class ProductForm
     {
         return $schema
             ->components([
-                // 1. PRIMARY INFO
-                Section::make('Product Primary Details')
-                    ->description('Main identifying info.')
-                    ->icon('heroicon-m-identification')
-                    ->columns(1)
-                    ->schema([
-                        TextInput::make('name')
-                            ->label('Product Name')
-                            ->required()
-                            ->maxLength(255)
-                            ->prefixIcon('heroicon-m-pencil-square'),
+                Wizard::make([
+                    // STEP 1: PRIMARY INFO
+                    Step::make('Product Primary Details')
+                        ->description('Main Product Information')
+                        ->icon('heroicon-m-identification')
+                        ->schema([
+                            Section::make()
+                                ->columns(1)
+                                ->schema([
+                                    TextInput::make('name')
+                                        ->label('Product Name')
+                                        ->required()
+                                        ->maxLength(255)
+                                        ->prefixIcon('heroicon-m-pencil-square')
+                                        ->placeholder('Enter product name...'),
 
-                        Select::make('material_type_id')
-                            ->label('Material Type')
-                            ->options(\App\Models\MaterialType::with('material')->get()->mapWithKeys(function ($item) {
-                                $materialName = $item->material->name ?? 'No Material';
-                                return [$item->id => "{$materialName} - {$item->name}"];
-                            }))
-                            ->searchable()
-                            ->preload()
-                            ->live()
-                            ->required()
-                            ->afterStateUpdated(function ($set, $get, $state) {
-                                if (!$state) {
-                                    $set('colorPrices', []);
-                                    return;
-                                }
+                                    Select::make('material_type_id')
+                                        ->label('Material Type Selection')
+                                        ->options(\App\Models\MaterialType::with('material')->get()->mapWithKeys(function ($item) {
+                                            $materialName = $item->material->name ?? 'No Material';
+                                            return [$item->id => "{$materialName} - {$item->name}"];
+                                        }))
+                                        ->searchable()
+                                        ->preload()
+                                        ->live()
+                                        ->required()
+                                        ->prefixIcon('heroicon-m-cube')
+                                        ->afterStateUpdated(function ($set, $get, $state) {
+                                            if (!$state) {
+                                                $set('colorPrices', []);
+                                                return;
+                                            }
 
-                                $mainColors = \App\Models\Color::where('material_type_id', $state)
-                                    ->whereNull('parent_id')
-                                    ->get();
+                                            // Re-populate only if it's a new material type to avoid clearing existing prices unnecessarily
+                                            // But standard behavior is to refresh if material/material-type changes.
+                                            $mainColors = \App\Models\Color::where('material_type_id', $state)
+                                                ->whereNull('parent_id')
+                                                ->get();
 
-                                $prices = $mainColors->map(function ($color) {
-                                    return [
-                                        'main_color_id' => $color->id,
-                                        'price' => 0,
-                                        'installation_price' => 0,
-                                    ];
-                                })->toArray();
+                                            $prices = $mainColors->map(function ($color) {
+                                                return [
+                                                    'main_color_id' => $color->id,
+                                                    'price' => 0,
+                                                    'installation_price' => 0,
+                                                ];
+                                            })->toArray();
 
-                                $set('colorPrices', $prices);
-                            }),
-                    ]),
+                                            $set('colorPrices', $prices);
+                                        }),
+                                ])
+                        ]),
 
-                // 2. PRICING REPEATER
-                Section::make('Color-Specific Pricing & Shades')
-                    ->description('Set individual rates for each available color.')
-                    ->icon('heroicon-m-banknotes')
-                    ->columns(1)
-                    ->schema([
-                        Repeater::make('colorPrices')
-                            ->relationship('colorPrices')
-                            ->label('Configurations')
-                            ->columns(1)
-                            ->addable(false)
-                            ->deletable(false)
-                            ->reorderable(false)
-                            ->schema([
-                                Select::make('main_color_id')
-                                    ->label('Main Color')
-                                    ->options(\App\Models\Color::pluck('name', 'id'))
-                                    ->disabled()
-                                    ->dehydrated()
-                                    ->prefixIcon('heroicon-m-swatch'),
+                    // STEP 2: PRICING & COLORS
+                    Step::make('Color-Specific Pricing & Shades')
+                        ->description('Set rates for each color variant.')
+                        ->icon('heroicon-m-banknotes')
+                        ->schema([
+                            Section::make('Configuration & Pricing')
+                                ->columns(1)
+                                ->schema([
+                                    Repeater::make('colorPrices')
+                                        ->relationship('colorPrices')
+                                        ->label('Configurations')
+                                        ->columns(1)
+                                        ->addable(false)
+                                        ->deletable(false)
+                                        ->reorderable(false)
+                                        ->schema([
+                                            Grid::make(2)
+                                                ->schema([
+                                                    Select::make('main_color_id')
+                                                        ->label('Main Color')
+                                                        ->options(\App\Models\Color::pluck('name', 'id'))
+                                                        ->disabled()
+                                                        ->dehydrated()
+                                                        ->prefixIcon('heroicon-m-swatch'),
 
-                                Select::make('subColors')
-                                    ->label('Sub Shades')
-                                    ->relationship('subColors', 'name')
-                                    ->multiple()
-                                    ->searchable()
-                                    ->preload()
-                                    ->prefixIcon('heroicon-m-list-bullet')
-                                    ->options(function (callable $get) {
-                                        $mainId = $get('main_color_id');
-                                        if (!$mainId) return [];
-                                        return \App\Models\Color::where('parent_id', $mainId)->pluck('name', 'id');
-                                    }),
+                                                    Select::make('subColors')
+                                                        ->label('Choose Shades (Multi)')
+                                                        ->relationship('subColors', 'name')
+                                                        ->multiple()
+                                                        ->searchable()
+                                                        ->preload()
+                                                        ->prefixIcon('heroicon-m-list-bullet')
+                                                        ->options(function (callable $get) {
+                                                            $mainId = $get('main_color_id');
+                                                            if (!$mainId) return [];
+                                                            return \App\Models\Color::where('parent_id', $mainId)->pluck('name', 'id');
+                                                        }),
+                                                ]),
 
-                                TextInput::make('price')
-                                    ->label('Unit Price (฿)')
-                                    ->numeric()
-                                    ->required()
-                                    ->prefix('฿'),
+                                            Grid::make(2)
+                                                ->schema([
+                                                    TextInput::make('price')
+                                                        ->label('Item Unit Price')
+                                                        ->numeric()
+                                                        ->required()
+                                                        ->prefix('฿')
+                                                        ->placeholder('0.00'),
 
-                                TextInput::make('installation_price')
-                                    ->label('Install Rate (฿)')
-                                    ->numeric()
-                                    ->required()
-                                    ->prefix('฿'),
-                            ])
-                            ->itemLabel(fn(array $state): ?string => \App\Models\Color::find($state['main_color_id'] ?? null)?->name),
-                    ]),
+                                                    TextInput::make('installation_price')
+                                                        ->label('Item Install Rate')
+                                                        ->numeric()
+                                                        ->required()
+                                                        ->prefix('฿')
+                                                        ->placeholder('0.00'),
+                                                ]),
+                                        ])
+                                        ->itemLabel(fn(array $state): ?string => \App\Models\Color::find($state['main_color_id'] ?? null)?->name),
+                                ])
+                        ]),
 
-                // 3. MEDIA
-                Section::make('Visual Documentation')
-                    ->icon('heroicon-m-photo')
-                    ->columns(1)
-                    ->schema([
-                        FileUpload::make('drawing_path')
-                            ->label('Product Image')
-                            ->image()
-                            ->imageEditor()
-                            ->directory('product-drawings')
-                            ->disk('public')
-                            ->visibility('public'),
-                    ]),
+                    // STEP 3: DOCUMENTATION
+                    Step::make('Technical Documentation')
+                        ->description('Visual assets and drawings.')
+                        ->icon('heroicon-m-photo')
+                        ->schema([
+                            Section::make('Product Drawing / Layout')
+                                ->columns(1)
+                                ->schema([
+                                    FileUpload::make('drawing_path')
+                                        ->label('Upload Product Drawing')
+                                        ->image()
+                                        ->imageEditor()
+                                        ->directory('product-drawings')
+                                        ->disk('public')
+                                        ->visibility('public')
+                                        ->hint('Accepted: JPG, PNG, WEBP.'),
+                                ]),
+                        ]),
+                ])
+                ->columnSpanFull()
+                // Persistence settings if needed, but Filament usually handles this.
             ]);
     }
 }

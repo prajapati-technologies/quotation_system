@@ -10,6 +10,11 @@ class Quotation extends Model
 
     protected $casts = [
         'quotation_date' => 'date',
+        'total_goods' => 'decimal:2',
+        'installation_total' => 'decimal:2',
+        'total_price' => 'decimal:2',
+        'vat_total' => 'decimal:2',
+        'final_price' => 'decimal:2',
     ];
 
     public function customer()
@@ -27,27 +32,31 @@ class Quotation extends Model
         return $this->hasMany(QuotationItem::class);
     }
 
-    /**
-     * Virtual: Sum of all item-level installations
-     */
-    public function getInstallationTotalAttribute()
-    {
-        return $this->items->sum(function($item) {
-            $area = ($item->width / 1000) * ($item->height / 1000);
-            return $area * floatval($item->installation_cost) * intval($item->quantity);
-        });
-    }
-
-    /**
-     * Virtual: Sum of all item-level product prices (after discount)
-     */
-    public function getTotalGoodsAttribute()
-    {
-        return $this->items->sum('price');
-    }
-
     public function getQuotationNumberAttribute()
     {
         return 'QT' . str_pad($this->id, 4, '0', STR_PAD_LEFT);
+    }
+
+    /** Invoice PDF number (paired with quotation id). */
+    public function getInvoiceNumberAttribute(): string
+    {
+        return 'INV' . str_pad((string) $this->id, 4, '0', STR_PAD_LEFT);
+    }
+
+    /** Receipt PDF number. */
+    public function getReceiptNumberAttribute(): string
+    {
+        return 'RCP' . str_pad((string) $this->id, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Customer no + quotation no for documents (e.g. #CN001 / #QT0021).
+     */
+    public function getFormattedReferenceAttribute(): string
+    {
+        $cn = $this->customer?->customer_number ?? $this->project?->customer?->customer_number;
+        $qt = $this->quotation_number;
+
+        return $cn ? "#{$cn} / #{$qt}" : "#{$qt}";
     }
 }

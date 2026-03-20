@@ -259,16 +259,17 @@ class QuotationForm
                     ->schema([
                         Grid::make(3)
                             ->schema([
-                                TextInput::make('total_goods')->label('Goods Total')->readOnly()->prefix('฿'),
-                                TextInput::make('installation_total')->label('Installation Total')->readOnly()->prefix('฿'),
-                                TextInput::make('total_price')->label('Total (Before VAT)')->readOnly()->prefix('฿'),
+                                TextInput::make('total_goods')->label('Goods Total')->readOnly()->dehydrated()->prefix('฿'),
+                                TextInput::make('installation_total')->label('Installation Total')->readOnly()->dehydrated()->prefix('฿'),
+                                TextInput::make('total_price')->label('Total (Before VAT)')->readOnly()->dehydrated()->prefix('฿'),
                                 
                                 TextInput::make('vat_total')
                                     ->label('VAT (' . \App\Models\Setting::get('vat_percent', 7) . '%)')
                                     ->readOnly()
+                                    ->dehydrated()
                                     ->prefix('฿'),
                                     
-                                TextInput::make('final_price')->label('Grand Total')->readOnly()->prefix('฿')
+                                TextInput::make('final_price')->label('Grand Total')->readOnly()->dehydrated()->prefix('฿')
                                     ->extraAttributes(['class' => 'font-bold text-xl text-primary-600']),
                             ]),
                     ]),

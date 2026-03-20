@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Quotations\Tables;
 
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -19,8 +20,9 @@ class QuotationsTable
         return $table
             ->actionsColumnLabel('Action')
             ->columns([
-                TextColumn::make('quotation_number')
-                    ->label('Quotation No')
+                TextColumn::make('id')
+                    ->label('Ref (CN / QT)')
+                    ->formatStateUsing(fn(\App\Models\Quotation $record): string => $record->formatted_reference)
                     ->searchable()
                     ->sortable()
                     ->weight(FontWeight::Bold),
@@ -92,7 +94,7 @@ class QuotationsTable
                     ->multiple(),
             ])
             ->recordActions([
-                \Filament\Actions\ActionGroup::make([
+                ActionGroup::make([
                     ViewAction::make()
                         ->color('info')
                         ->modalWidth('7xl'),
@@ -100,11 +102,24 @@ class QuotationsTable
                     EditAction::make()
                         ->visible(fn(\App\Models\Quotation $record) => auth()->user()->role === 'sales' && $record->status === 'Draft'),
 
-                    Action::make('download')
+                    ActionGroup::make([
+                        Action::make('downloadQuotationPdf')
+                            ->label('Quotation')
+                            ->icon('heroicon-o-document-text')
+                            ->action(fn(\App\Models\Quotation $record) => self::downloadPdf($record, 'quotation')),
+                        Action::make('downloadInvoicePdf')
+                            ->label('Invoice')
+                            ->icon('heroicon-o-document-currency-dollar')
+                            ->action(fn(\App\Models\Quotation $record) => self::downloadPdf($record, 'invoice')),
+                        Action::make('downloadReceiptPdf')
+                            ->label('Receipt')
+                            ->icon('heroicon-o-receipt-percent')
+                            ->action(fn(\App\Models\Quotation $record) => self::downloadPdf($record, 'receipt')),
+                    ])
                         ->label('PDF')
-                        ->icon('heroicon-o-document-arrow-down')
+                        ->icon('heroicon-o-arrow-down-tray')
                         ->color('gray')
-                        ->action(fn(\App\Models\Quotation $record) => self::downloadPdf($record)),
+                        ->button(),
 
                     Action::make('sign')
                         ->label('Sign')
@@ -176,9 +191,33 @@ class QuotationsTable
             ->paginated([10, 25, 50, 100]);
     }
 
-    public static function downloadPdf(\App\Models\Quotation $quotation)
+    public static function downloadPdf(\App\Models\Quotation $quotation, string $documentType = 'quotation'): \Symfony\Component\HttpFoundation\StreamedResponse
     {
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('quotation-pdf', ['quotation' => $quotation]);
-        return response()->streamDownload(fn() => print ($pdf->output()), "Quotation-{$quotation->id}.pdf");
+        $documentType = in_array($documentType, ['quotation', 'invoice', 'receipt'], true)
+            ? $documentType
+            : 'quotation';
+
+        $quotation->loadMissing([
+            'customer',
+            'project.customer',
+            'items.product',
+            'items.color',
+            'items.glass',
+        ]);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('quotation-pdf', [
+            'quotation' => $quotation,
+            'documentType' => $documentType,
+        ]);
+
+        $fileStem = match ($documentType) {
+            'invoice' => 'Invoice-'.$quotation->invoice_number,
+            'receipt' => 'Receipt-'.$quotation->receipt_number,
+            default => 'Quotation-'.$quotation->quotation_number,
+        };
+
+        $safeName = preg_replace('/[^\w\-.]+/u', '_', $fileStem) . '.pdf';
+
+        return response()->streamDownload(fn() => print ($pdf->output()), $safeName);
     }
 }
