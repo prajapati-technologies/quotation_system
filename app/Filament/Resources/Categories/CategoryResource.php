@@ -17,22 +17,9 @@ class CategoryResource extends Resource
 {
     protected static ?string $model = Category::class;
 
-    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-rectangle-stack';
-
-    protected static ?string $navigationLabel = 'Categories';
-    protected static ?string $modelLabel = 'Category';
-    protected static ?string $pluralModelLabel = 'Categories';
-
-    protected static ?int $navigationSort = 5;
-
-    public static function getNavigationGroup(): ?string
-    {
-        return 'Materials';
-    }
-
     public static function shouldRegisterNavigation(): bool
     {
-        return auth()->user()->role === 'admin';
+        return false;
     }
 
     public static function form(Schema $schema): Schema
@@ -45,19 +32,10 @@ class CategoryResource extends Resource
         return CategoriesTable::configure($table);
     }
 
-    public static function getRelations(): array
-    {
-        return [
-            //
-        ];
-    }
-
     public static function getPages(): array
     {
         return [
             'index' => ListCategories::route('/'),
-            'create' => CreateCategory::route('/create'),
-            'edit' => EditCategory::route('/{record}/edit'),
         ];
     }
 }

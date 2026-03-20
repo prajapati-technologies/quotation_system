@@ -18,20 +18,9 @@ class BrandResource extends Resource
 {
     protected static ?string $model = Brand::class;
 
-    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-tag';
-
-    protected static ?string $recordTitleAttribute = 'name';
-
-    protected static ?string $navigationLabel = 'Classifications (Brands)';
-
-    public static function getNavigationGroup(): ?string
-    {
-        return 'Materials';
-    }
-
     public static function shouldRegisterNavigation(): bool
     {
-        return auth()->user()->role === 'admin';
+        return false;
     }
 
     public static function form(Schema $schema): Schema
@@ -44,19 +33,10 @@ class BrandResource extends Resource
         return BrandsTable::configure($table);
     }
 
-    public static function getRelations(): array
-    {
-        return [
-            RelationManagers\BrandRatesRelationManager::class,
-        ];
-    }
-
     public static function getPages(): array
     {
         return [
             'index' => ListBrands::route('/'),
-            'create' => CreateBrand::route('/create'),
-            'edit' => EditBrand::route('/{record}/edit'),
         ];
     }
 }
