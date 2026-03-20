@@ -213,6 +213,13 @@ class QuotationForm
                             ->live()
                             ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get)),
 
+                        TextInput::make('discount_amount')
+                            ->label('Item Discount (฿)')
+                            ->numeric()
+                            ->default(0)
+                            ->live()
+                            ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get)),
+
                         CheckboxList::make('accessories')
                             ->label('Accessories')
                             ->options(Accessory::pluck('name', 'id'))
@@ -233,16 +240,8 @@ class QuotationForm
                             ->schema([
                                 TextInput::make('total_goods')->label('Goods Total')->readOnly()->prefix('฿'),
                                 TextInput::make('installation_total')->label('Installation Total')->readOnly()->prefix('฿'),
-                                TextInput::make('total_price')->label('Subtotal')->readOnly()->prefix('฿'),
+                                TextInput::make('total_price')->label('Total (Before VAT)')->readOnly()->prefix('฿'),
                                 
-                                TextInput::make('discount_total')
-                                    ->label('Discount')
-                                    ->numeric()
-                                    ->default(0)
-                                    ->live()
-                                    ->prefix('฿')
-                                    ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get)),
-
                                 TextInput::make('vat_total')
                                     ->label('VAT (' . \App\Models\Setting::get('vat_percent', 7) . '%)')
                                     ->readOnly()
@@ -261,13 +260,13 @@ class QuotationForm
         $totalGoods = 0;
         $totalInstallation = 0;
         $vatPercent = floatval(\App\Models\Setting::get('vat_percent', 7));
-        $discount = floatval($get('discount_total', 0));
 
         foreach ($items as $key => $item) {
             $productId = $item['product_id'] ?? null;
             $mainColorId = $item['color_id'] ?? null;
             $glassId = $item['glass_id'] ?? null;
             $accessoryIds = $item['accessories'] ?? [];
+            $itemDiscount = floatval($item['discount_amount'] ?? 0);
             
             $priceData = ProductColorPrice::where('product_id', $productId)
                 ->where('main_color_id', $mainColorId)
@@ -291,7 +290,10 @@ class QuotationForm
                 $accessoriesPrice = floatval(Accessory::whereIn('id', $accessoryIds)->sum('price'));
             }
 
-            $itemGoods = ($basePrice + $glassPricePerSqm) * $area * $qty + ($accessoriesPrice * $qty);
+            // Goods Total per item: (Base + Glass) * Area * Qty + Accessories - ItemDiscount
+            $itemGoods = (($basePrice + $glassPricePerSqm) * $area * $qty) + ($accessoriesPrice * $qty) - $itemDiscount;
+            if ($itemGoods < 0) $itemGoods = 0;
+
             $itemInstall = $installRate * $area * $qty;
 
             $set("items.{$key}.price", number_format($itemGoods, 2, '.', ''));
@@ -300,15 +302,13 @@ class QuotationForm
             $totalInstallation += $itemInstall;
         }
 
-        $totalBeforeVatAndDiscount = $totalGoods + $totalInstallation;
-        $totalAfterDiscount = $totalBeforeVatAndDiscount - $discount;
-        
-        $vatAmount = $totalAfterDiscount * ($vatPercent / 100);
-        $grandTotal = $totalAfterDiscount + $vatAmount;
+        $totalBeforeVat = $totalGoods + $totalInstallation;
+        $vatAmount = $totalBeforeVat * ($vatPercent / 100);
+        $grandTotal = $totalBeforeVat + $vatAmount;
 
         $set('total_goods', number_format($totalGoods, 2, '.', ''));
         $set('installation_total', number_format($totalInstallation, 2, '.', ''));
-        $set('total_price', number_format($totalBeforeVatAndDiscount, 2, '.', ''));
+        $set('total_price', number_format($totalBeforeVat, 2, '.', ''));
         $set('vat_total', number_format($vatAmount, 2, '.', ''));
         $set('final_price', number_format($grandTotal, 2, '.', ''));
     }
