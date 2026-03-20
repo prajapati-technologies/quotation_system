@@ -17,15 +17,17 @@ class ProductForm
     {
         return $schema
             ->components([
-                Section::make('General Information')
-                    ->icon('heroicon-o-pencil-square')
-                    ->columns(1) // Force 1 column for the section
+                // 1. PRIMARY INFO
+                Section::make('Product Primary Details')
+                    ->description('Main identifying info.')
+                    ->icon('heroicon-m-identification')
+                    ->columns(1)
                     ->schema([
                         TextInput::make('name')
                             ->label('Product Name')
                             ->required()
                             ->maxLength(255)
-                            ->placeholder('e.g. Sliding Window 2 panels'),
+                            ->prefixIcon('heroicon-m-pencil-square'),
 
                         Select::make('material_type_id')
                             ->label('Material Type')
@@ -34,6 +36,7 @@ class ProductForm
                                 return [$item->id => "{$materialName} - {$item->name}"];
                             }))
                             ->searchable()
+                            ->preload()
                             ->live()
                             ->required()
                             ->afterStateUpdated(function ($set, $get, $state) {
@@ -58,28 +61,34 @@ class ProductForm
                             }),
                     ]),
 
-                Section::make('Available Colors & Pricing')
-                    ->icon('heroicon-o-swatch')
-                    ->description('Set individual prices for each color.')
-                    ->columns(1) // Force 1 column for the section
+                // 2. PRICING REPEATER
+                Section::make('Color-Specific Pricing & Shades')
+                    ->description('Set individual rates for each available color.')
+                    ->icon('heroicon-m-banknotes')
+                    ->columns(1)
                     ->schema([
                         Repeater::make('colorPrices')
                             ->relationship('colorPrices')
                             ->label('Configurations')
-                            ->columns(1) // Force 1 column inside the repeater
+                            ->columns(1)
+                            ->addable(false)
+                            ->deletable(false)
+                            ->reorderable(false)
                             ->schema([
                                 Select::make('main_color_id')
                                     ->label('Main Color')
                                     ->options(\App\Models\Color::pluck('name', 'id'))
                                     ->disabled()
-                                    ->dehydrated(),
+                                    ->dehydrated()
+                                    ->prefixIcon('heroicon-m-swatch'),
 
                                 Select::make('subColors')
-                                    ->label('Sub Shades (Multi-select)')
+                                    ->label('Sub Shades')
                                     ->relationship('subColors', 'name')
                                     ->multiple()
                                     ->searchable()
                                     ->preload()
+                                    ->prefixIcon('heroicon-m-list-bullet')
                                     ->options(function (callable $get) {
                                         $mainId = $get('main_color_id');
                                         if (!$mainId) return [];
@@ -89,31 +98,30 @@ class ProductForm
                                 TextInput::make('price')
                                     ->label('Unit Price (฿)')
                                     ->numeric()
-                                    ->required(),
+                                    ->required()
+                                    ->prefix('฿'),
 
                                 TextInput::make('installation_price')
                                     ->label('Install Rate (฿)')
                                     ->numeric()
-                                    ->required(),
+                                    ->required()
+                                    ->prefix('฿'),
                             ])
-                            ->addable(false)
-                            ->deletable(false)
-                            ->reorderable(false)
-                            ->itemLabel(fn(array $state): ?string => \App\Models\Color::find($state['main_color_id'])?->name),
+                            ->itemLabel(fn(array $state): ?string => \App\Models\Color::find($state['main_color_id'] ?? null)?->name),
                     ]),
 
-                Section::make('Visual Assets')
-                    ->icon('heroicon-o-camera')
-                    ->columns(1) // Force 1 column
+                // 3. MEDIA
+                Section::make('Visual Documentation')
+                    ->icon('heroicon-m-photo')
+                    ->columns(1)
                     ->schema([
                         FileUpload::make('drawing_path')
-                            ->label('Product Drawing / Image')
+                            ->label('Product Image')
                             ->image()
                             ->imageEditor()
-                            ->disk('public')
                             ->directory('product-drawings')
-                            ->visibility('public')
-                            ->maxSize(10240),
+                            ->disk('public')
+                            ->visibility('public'),
                     ]),
             ]);
     }

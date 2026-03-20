@@ -186,6 +186,17 @@ class QuotationForm
                             ->live()
                             ->afterStateUpdated(function (callable $set, callable $get) {
                                 $set('sub_color_id', null);
+                                
+                                // AUTO-FILL INSTALLATION RATE
+                                $productId = $get('product_id');
+                                $mainColorId = $get('color_id');
+                                if ($productId && $mainColorId) {
+                                    $priceData = ProductColorPrice::where('product_id', $productId)
+                                        ->where('main_color_id', $mainColorId)
+                                        ->first();
+                                    $set('installation_rate', $priceData?->installation_price ?? 0);
+                                }
+                                
                                 self::updatePrices($set, $get);
                             }),
 
@@ -214,10 +225,20 @@ class QuotationForm
                             ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get)),
 
                         TextInput::make('discount_amount')
-                            ->label('Item Discount (฿)')
+                            ->label('Discount (%)')
                             ->numeric()
                             ->default(0)
                             ->live()
+                            ->suffix('%')
+                            ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get)),
+
+                        TextInput::make('installation_rate')
+                            ->label('Install Rate (฿)')
+                            ->numeric()
+                            ->required()
+                            ->live()
+                            ->prefix('฿')
+                            ->hint('Auto-filled but editable.')
                             ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get)),
 
                         CheckboxList::make('accessories')
@@ -225,7 +246,7 @@ class QuotationForm
                             ->options(Accessory::pluck('name', 'id'))
                             ->live()
                             ->columns(2)
-                            ->columnSpan(3)
+                            ->columnSpan(2) // Reduced column span to fit Install Rate
                             ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get)),
 
                         TextInput::make('price')->label('Item Total')->numeric()->readOnly()->dehydrated()->prefix('฿'),
@@ -266,17 +287,25 @@ class QuotationForm
             $mainColorId = $item['color_id'] ?? null;
             $glassId = $item['glass_id'] ?? null;
             $accessoryIds = $item['accessories'] ?? [];
-            $itemDiscount = floatval($item['discount_amount'] ?? 0);
+            $itemDiscountPercent = floatval($item['discount_amount'] ?? 0);
+            
+            // USE MANUAL OVERRIDE INSTALL RATE IF AVAILABLE
+            $installRate = floatval($item['installation_rate'] ?? 0);
             
             $priceData = ProductColorPrice::where('product_id', $productId)
                 ->where('main_color_id', $mainColorId)
                 ->first();
 
             $basePrice = floatval($priceData?->price ?? 0);
-            $installRate = floatval($priceData?->installation_price ?? 0);
+            
+            // If installRate is 0 and we haven't touched it, maybe fetch from DB to be safe
+            // But usually the form state is reliable.
 
-            $width = ($item['width'] ?? 0) / 1000;
-            $height = ($item['height'] ?? 0) / 1000;
+            $widthVal = floatval($item['width'] ?? 0);
+            $heightVal = floatval($item['height'] ?? 0);
+            
+            $width = $widthVal / 1000;
+            $height = $heightVal / 1000;
             $area = max(1.0, $width * $height);
             $qty = intval($item['quantity'] ?? 1);
 
@@ -290,10 +319,13 @@ class QuotationForm
                 $accessoriesPrice = floatval(Accessory::whereIn('id', $accessoryIds)->sum('price'));
             }
 
-            // Goods Total per item: (Base + Glass) * Area * Qty + Accessories - ItemDiscount
-            $itemGoods = (($basePrice + $glassPricePerSqm) * $area * $qty) + ($accessoriesPrice * $qty) - $itemDiscount;
+            $rawGoods = (($basePrice + $glassPricePerSqm) * $area * $qty) + ($accessoriesPrice * $qty);
+            $discountValue = $rawGoods * ($itemDiscountPercent / 100);
+            $itemGoods = $rawGoods - $discountValue;
+            
             if ($itemGoods < 0) $itemGoods = 0;
 
+            // Calculation using the (potentially overridden) installRate
             $itemInstall = $installRate * $area * $qty;
 
             $set("items.{$key}.price", number_format($itemGoods, 2, '.', ''));
