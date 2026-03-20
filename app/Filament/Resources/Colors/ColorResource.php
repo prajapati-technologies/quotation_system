@@ -20,12 +20,12 @@ class ColorResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-swatch';
 
-    protected static ?int $navigationSort = 6;
-
     public static function getNavigationGroup(): ?string
     {
-        return 'Materials';
+        return 'Master Data';
     }
+
+    protected static ?int $navigationSort = 22;
 
     protected static ?string $recordTitleAttribute = 'name';
 

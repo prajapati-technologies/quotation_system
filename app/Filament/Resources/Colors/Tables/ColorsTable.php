@@ -9,6 +9,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Filament\Tables\Filters\SelectFilter;
 
 class ColorsTable
 {
@@ -16,54 +17,50 @@ class ColorsTable
     {
         return $table
             ->columns([
-                TextColumn::make('category.brand.name')
-                    ->label('Brand')
+                TextColumn::make('materialType.name')
+                    ->label('Material Type')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('category.name')
-                    ->label('Category')
+
+                TextColumn::make('parent.name')
+                    ->label('Main Color')
+                    ->placeholder('None (Is Main Color)')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('category.sub_category')
-                    ->label('Sub Category')
-                    ->searchable()
-                    ->sortable()
-                    ->toggleable(),
+
                 TextColumn::make('name')
                     ->label('Color Name')
                     ->searchable()
                     ->sortable(),
+
                 TextColumn::make('code')
                     ->label('Code')
                     ->searchable(),
-                TextColumn::make('color_type')
-                    ->badge()
-                    ->color(fn(string $state): string => match ($state) {
-                        'NORMAL' => 'success',
-                        'SPECIAL' => 'warning',
-                        default => 'gray',
-                    }),
+
                 TextColumn::make('additional_price')
-                    ->money()
+                    ->money('THB')
                     ->sortable(),
+
                 TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('material_type_id')
+                    ->label('Material Type')
+                    ->relationship('materialType', 'name'),
+
+                SelectFilter::make('parent_id')
+                    ->label('Main Color')
+                    ->relationship('parent', 'name'),
             ])
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make(),
                 DeleteAction::make(),
             ])
-            ->toolbarActions([
+            ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Colors\Schemas;
 
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Hidden;
 use Filament\Schemas\Schema;
 
 class ColorForm
@@ -12,72 +13,55 @@ class ColorForm
     {
         return $schema
             ->components([
-                Select::make('brand_id')
-                    ->label('Brand')
-                    ->options(\App\Models\Brand::pluck('name', 'id'))
-                    ->afterStateHydrated(function (Select $component, $record) {
-                        if ($record && $record->category) {
-                            $component->state($record->category->brand_id);
-                        }
-                    })
-                    ->searchable()
-                    ->live()
-                    ->required()
+                // Persistence of the mode (Main or Sub)
+                Hidden::make('is_sub_color')
+                    ->default(fn () => request()->query('is_sub_color', '0'))
                     ->dehydrated(false),
-                Select::make('category_id')
-                    ->label('Category')
+
+                Select::make('material_type_id')
+                    ->label('Material Type')
+                    ->options(\App\Models\MaterialType::with('material')->get()->mapWithKeys(function ($item) {
+                        $materialName = $item->material->name ?? 'No Material';
+                        return [$item->id => "{$materialName} - {$item->name}"];
+                    }))
+                    ->searchable()
+                    ->live()
+                    ->required(),
+
+                Select::make('parent_id')
+                    ->label('Main Color')
+                    ->placeholder('Select the Main Color')
                     ->options(function (callable $get) {
-                        $brandId = $get('brand_id');
-                        if (!$brandId) {
-                            return \App\Models\Category::pluck('name', 'id');
+                        $materialTypeId = $get('material_type_id');
+                        if (!$materialTypeId) {
+                            return [];
                         }
-                        return \App\Models\Category::where('brand_id', $brandId)->pluck('name', 'id');
+                        return \App\Models\Color::where('material_type_id', $materialTypeId)
+                            ->whereNull('parent_id')
+                            ->pluck('name', 'id');
                     })
                     ->searchable()
-                    ->required()
-                    ->live()
-                    ->afterStateUpdated(function ($state, callable $set) {
-                        if ($state) {
-                            $category = \App\Models\Category::find($state);
-                            $set('sub_category_display', $category?->sub_category);
-                        } else {
-                            $set('sub_category_display', null);
-                        }
-                    }),
-                TextInput::make('sub_category_display')
-                    ->label('Sub Category')
-                    ->placeholder('Select a category to see sub-category')
-                    ->disabled()
-                    ->dehydrated(false)
-                    ->afterStateHydrated(function ($component, $record) {
-                        if ($record && $record->category) {
-                            $component->state($record->category->sub_category);
-                        }
-                    }),
+                    ->visible(fn ($get, $record) => $get('is_sub_color') === '1' || ($record && $record->parent_id !== null))
+                    ->required(fn ($get, $record) => $get('is_sub_color') === '1' || ($record && $record->parent_id !== null))
+                    ->live(),
+
                 TextInput::make('name')
-                    ->label('Color Name')
+                    ->label(fn ($get, $record) => ($get('is_sub_color') === '1' || ($record && $record->parent_id !== null)) ? 'Sub Color Name' : 'Main Color Name')
+                    ->placeholder('e.g. Matt Black, Crystal White')
                     ->required()
                     ->maxLength(255),
+
                 TextInput::make('code')
                     ->label('Color Code')
+                    ->placeholder('e.g. #000000 or BL-01')
                     ->maxLength(255),
-                Select::make('color_type')
-                    ->options([
-                        'NORMAL' => 'NORMAL',
-                        'SPECIAL' => 'SPECIAL',
-                    ])
-                    ->required()
-                    ->default('NORMAL')
-                    ->live(),
+
                 TextInput::make('additional_price')
                     ->label('Additional Price')
-                    ->required()
                     ->numeric()
-                    ->default(0.00)
+                    ->default(0)
                     ->prefix('฿')
-                    ->disabled(fn(callable $get) => $get('color_type') === 'NORMAL')
-                    ->dehydrated() // Ensure it's saved even if disabled
-                    ->formatStateUsing(fn(string $state, callable $get) => $get('color_type') === 'NORMAL' ? 0 : $state),
+                    ->required(),
             ]);
     }
 }

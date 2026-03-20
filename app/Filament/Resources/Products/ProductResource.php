@@ -20,11 +20,11 @@ class ProductResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-shopping-bag';
 
-    protected static ?int $navigationSort = 7;
+    protected static ?int $navigationSort = 25;
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Materials';
+        return 'Master Data';
     }
 
     public static function shouldRegisterNavigation(): bool

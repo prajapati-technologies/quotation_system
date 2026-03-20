@@ -18,11 +18,18 @@ class Color extends Model
         return $this->belongsTo(Category::class);
     }
 
-    /**
-     * Get the brand through the category.
-     */
-    public function brand()
+    public function materialType(): BelongsTo
     {
-        return $this->category->brand();
+        return $this->belongsTo(MaterialType::class);
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Color::class, 'parent_id');
+    }
+
+    public function subColors()
+    {
+        return $this->hasMany(Color::class, 'parent_id');
     }
 }

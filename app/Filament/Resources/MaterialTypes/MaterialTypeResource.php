@@ -25,6 +25,8 @@ class MaterialTypeResource extends Resource
         return 'Master Data';
     }
 
+    protected static ?int $navigationSort = 20;
+
     public static function shouldRegisterNavigation(): bool
     {
         return auth()->user()->role === 'admin';

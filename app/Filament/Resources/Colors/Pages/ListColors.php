@@ -13,7 +13,17 @@ class ListColors extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            CreateAction::make('create_sub_color')
+                ->label('Add Sub Color')
+                ->icon('heroicon-o-swatch')
+                ->color('success')
+                ->url(fn (): string => static::getResource()::getUrl('create', ['is_sub_color' => '1'])),
+
+            CreateAction::make('create_main_color')
+                ->label('Add Main Color')
+                ->icon('heroicon-o-plus-circle')
+                ->color('primary')
+                ->url(fn (): string => static::getResource()::getUrl('create', ['is_sub_color' => '0'])),
         ];
     }
 }

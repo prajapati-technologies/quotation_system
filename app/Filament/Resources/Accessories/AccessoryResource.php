@@ -24,10 +24,10 @@ class AccessoryResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'Materials';
+        return 'Master Data';
     }
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 24;
 
     public static function shouldRegisterNavigation(): bool
     {

@@ -28,6 +28,7 @@ class MaterialResource extends Resource
     {
         return 'Master Data';
     }
+    protected static ?int $navigationSort = 21;
 
     public static function shouldRegisterNavigation(): bool
     {
