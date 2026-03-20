@@ -13,9 +13,13 @@ class SettingForm
         return $schema
             ->components([
                 TextInput::make('key')
-                    ->required(),
-                Textarea::make('value')
-                    ->columnSpanFull(),
+                    ->required()
+                    ->unique(ignoreRecord: true)
+                    ->helperText('Use "vat_percent" for the VAT setting.')
+                    ->disabled(fn($record) => $record !== null), // Key should be fixed after creation
+                TextInput::make('value')
+                    ->required()
+                    ->helperText('For "vat_percent", enter a numeric value (e.g., 7 for 7%).'),
             ]);
     }
 }

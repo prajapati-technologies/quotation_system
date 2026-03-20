@@ -393,12 +393,14 @@ class QuotationForm
                                 TextInput::make('vat_percent')
                                     ->label('VAT (%)')
                                     ->numeric()
-                                    ->default(0)
+                                    ->default(fn() => \App\Models\Setting::get('vat_percent', 0))
+                                    ->readOnly()
+                                    ->dehydrated()
                                     ->minValue(0)
                                     ->live()
                                     ->suffix('%')
                                     ->placeholder('0')
-                                    ->helperText('VAT applied after discount')
+                                    ->helperText('VAT is fixed by Admin in settings.')
                                     ->afterStateUpdated(fn(callable $set, callable $get) => self::updatePrices($set, $get)),
 
                                 TextInput::make('vat_amount')

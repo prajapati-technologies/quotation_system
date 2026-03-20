@@ -90,7 +90,15 @@ class SetupSeeder extends Seeder
         Color::create(['category_id' => $catAnodize->id, 'name' => 'Natural Anodize', 'color_type' => 'NORMAL', 'additional_price' => 0]);
         Color::create(['category_id' => $catAnodize->id, 'name' => 'Champagne', 'color_type' => 'SPECIAL', 'additional_price' => 800]);
 
-        // 8. Users
+
+        // 9. Default Settings
+        if (!\App\Models\Setting::where('key', 'vat_percent')->exists()) {
+            \App\Models\Setting::create([
+                'key' => 'vat_percent',
+                'value' => '7' // Default 7% (standard in Thailand or commonly used)
+            ]);
+        }
+
         if (!User::where('email', 'admin@example.com')->exists()) {
             User::create([
                 'name' => 'Admin',

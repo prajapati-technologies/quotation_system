@@ -16,6 +16,9 @@ class SettingsTable
             ->columns([
                 TextColumn::make('key')
                     ->searchable(),
+                TextColumn::make('value')
+                    ->limit(50)
+                    ->searchable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
