@@ -5,55 +5,54 @@ namespace App\Filament\Resources\Materials;
 use App\Filament\Resources\Materials\Pages\CreateMaterial;
 use App\Filament\Resources\Materials\Pages\EditMaterial;
 use App\Filament\Resources\Materials\Pages\ListMaterials;
-use App\Filament\Resources\Materials\Schemas\MaterialForm;
-use App\Filament\Resources\Materials\Tables\MaterialsTable;
 use App\Models\Material;
-use BackedEnum;
 use Filament\Resources\Resource;
+use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Filament\Tables\Columns\TextColumn;
+use BackedEnum;
 
 class MaterialResource extends Resource
 {
     protected static ?string $model = Material::class;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-cube';
-
-    protected static ?string $navigationLabel = 'Materials';
-    protected static ?string $modelLabel = 'Material';
-    protected static ?string $pluralModelLabel = 'Materials';
+    
+    protected static ?int $navigationSort = 20;
 
     public static function getNavigationGroup(): ?string
     {
         return 'Master Data';
     }
-    protected static ?int $navigationSort = 21;
-
-    public static function shouldRegisterNavigation(): bool
-    {
-        return auth()->user()->role === 'admin';
-    }
-
-    protected static ?string $recordTitleAttribute = 'name';
-
-
 
     public static function form(Schema $schema): Schema
     {
-        return MaterialForm::configure($schema);
+        return $schema
+            ->components([
+                TextInput::make('name')
+                    ->required()
+                    ->maxLength(255),
+            ]);
     }
 
     public static function table(Table $table): Table
     {
-        return MaterialsTable::configure($table);
-    }
-
-    public static function getRelations(): array
-    {
-        return [
-            //
-        ];
+        return $table
+            ->columns([
+                TextColumn::make('name')->searchable()->sortable(),
+                TextColumn::make('created_at')->dateTime()->sortable()->toggleable(isToggledHiddenByDefault: true),
+            ])
+            ->filters([])
+            ->actions([
+                \Filament\Tables\Actions\EditAction::make(),
+                \Filament\Tables\Actions\DeleteAction::make(),
+            ])
+            ->bulkActions([
+                \Filament\Tables\Actions\BulkActionGroup::make([
+                    \Filament\Tables\Actions\DeleteBulkAction::make(),
+                ]),
+            ]);
     }
 
     public static function getPages(): array

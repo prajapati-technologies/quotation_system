@@ -11,8 +11,6 @@ use App\Models\Product;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Table;
 
 class ProductResource extends Resource
 {
@@ -37,7 +35,7 @@ class ProductResource extends Resource
         return ProductForm::configure($schema);
     }
 
-    public static function table(Table $table): Table
+    public static function table(\Filament\Tables\Table $table): \Filament\Tables\Table
     {
         return ProductsTable::configure($table);
     }

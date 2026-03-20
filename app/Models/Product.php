@@ -10,11 +10,6 @@ class Product extends Model
 {
     protected $guarded = [];
 
-    public function brandRates(): HasMany
-    {
-        return $this->hasMany(BrandRate::class);
-    }
-
     public function colorPrices(): HasMany
     {
         return $this->hasMany(ProductColorPrice::class);

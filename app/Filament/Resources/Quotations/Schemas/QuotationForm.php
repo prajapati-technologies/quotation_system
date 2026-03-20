@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Quotations\Schemas;
 
-use App\Models\Brand;
 use App\Models\Color;
 use App\Models\Glass;
 use App\Models\MaterialType;
@@ -124,6 +123,7 @@ class QuotationForm
                                 $set('material_type_id', null);
                                 $set('product_id', null);
                                 $set('color_id', null);
+                                $set('sub_color_id', null);
                             }),
 
                         Select::make('material_type_id')
@@ -173,7 +173,7 @@ class QuotationForm
                             ->extraAttributes(['class' => 'font-bold text-sm text-gray-500 mb-1 border-b pb-1 mt-4'])
                             ->columnSpanFull(),
 
-                        Select::make('color_id') // Using this for Main Color
+                        Select::make('color_id') 
                             ->label('Main Color')
                             ->options(function (callable $get) {
                                 $productId = $get('product_id');
@@ -203,7 +203,8 @@ class QuotationForm
                                 return $priceRecord ? $priceRecord->subColors()->pluck('name', 'colors.id') : [];
                             })
                             ->required()
-                            ->live(),
+                            ->live()
+                            ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get)),
 
                         Select::make('glass_id')
                             ->label('Glass Type')
@@ -217,7 +218,8 @@ class QuotationForm
                             ->options(Accessory::pluck('name', 'id'))
                             ->live()
                             ->columns(2)
-                            ->columnSpan(3),
+                            ->columnSpan(3)
+                            ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get)),
 
                         TextInput::make('price')->label('Item Total')->numeric()->readOnly()->dehydrated()->prefix('฿'),
                     ])
@@ -227,11 +229,25 @@ class QuotationForm
                 Section::make('Total Financials')
                     ->columnSpanFull()
                     ->schema([
-                        Grid::make(4)
+                        Grid::make(3)
                             ->schema([
                                 TextInput::make('total_goods')->label('Goods Total')->readOnly()->prefix('฿'),
                                 TextInput::make('installation_total')->label('Installation Total')->readOnly()->prefix('฿'),
                                 TextInput::make('total_price')->label('Subtotal')->readOnly()->prefix('฿'),
+                                
+                                TextInput::make('discount_total')
+                                    ->label('Discount')
+                                    ->numeric()
+                                    ->default(0)
+                                    ->live()
+                                    ->prefix('฿')
+                                    ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get)),
+
+                                TextInput::make('vat_total')
+                                    ->label('VAT (' . \App\Models\Setting::get('vat_percent', 7) . '%)')
+                                    ->readOnly()
+                                    ->prefix('฿'),
+                                    
                                 TextInput::make('final_price')->label('Grand Total')->readOnly()->prefix('฿')
                                     ->extraAttributes(['class' => 'font-bold text-xl text-primary-600']),
                             ]),
@@ -244,13 +260,15 @@ class QuotationForm
         $items = $get('items') ?? [];
         $totalGoods = 0;
         $totalInstallation = 0;
-        $vatPercent = floatval(\App\Models\Setting::get('vat_percent', 0));
+        $vatPercent = floatval(\App\Models\Setting::get('vat_percent', 7));
+        $discount = floatval($get('discount_total', 0));
 
         foreach ($items as $key => $item) {
             $productId = $item['product_id'] ?? null;
             $mainColorId = $item['color_id'] ?? null;
+            $glassId = $item['glass_id'] ?? null;
+            $accessoryIds = $item['accessories'] ?? [];
             
-            // Get price from product_color_prices table
             $priceData = ProductColorPrice::where('product_id', $productId)
                 ->where('main_color_id', $mainColorId)
                 ->first();
@@ -260,12 +278,20 @@ class QuotationForm
 
             $width = ($item['width'] ?? 0) / 1000;
             $height = ($item['height'] ?? 0) / 1000;
-            $area = $width * $height;
-            if ($area < 1) $area = 1; // Minimum area logic if exists, or keep as is
-
+            $area = max(1.0, $width * $height);
             $qty = intval($item['quantity'] ?? 1);
-            
-            $itemGoods = $basePrice * $area * $qty;
+
+            $glassPricePerSqm = 0;
+            if ($glassId) {
+                $glassPricePerSqm = floatval(Glass::find($glassId)?->price_per_sqm ?? 0);
+            }
+
+            $accessoriesPrice = 0;
+            if (!empty($accessoryIds)) {
+                $accessoriesPrice = floatval(Accessory::whereIn('id', $accessoryIds)->sum('price'));
+            }
+
+            $itemGoods = ($basePrice + $glassPricePerSqm) * $area * $qty + ($accessoriesPrice * $qty);
             $itemInstall = $installRate * $area * $qty;
 
             $set("items.{$key}.price", number_format($itemGoods, 2, '.', ''));
@@ -274,13 +300,16 @@ class QuotationForm
             $totalInstallation += $itemInstall;
         }
 
-        $totalBeforeVat = $totalGoods + $totalInstallation;
-        $vatAmount = $totalBeforeVat * ($vatPercent / 100);
-        $grandTotal = $totalBeforeVat + $vatAmount;
+        $totalBeforeVatAndDiscount = $totalGoods + $totalInstallation;
+        $totalAfterDiscount = $totalBeforeVatAndDiscount - $discount;
+        
+        $vatAmount = $totalAfterDiscount * ($vatPercent / 100);
+        $grandTotal = $totalAfterDiscount + $vatAmount;
 
         $set('total_goods', number_format($totalGoods, 2, '.', ''));
         $set('installation_total', number_format($totalInstallation, 2, '.', ''));
-        $set('total_price', number_format($totalBeforeVat, 2, '.', ''));
+        $set('total_price', number_format($totalBeforeVatAndDiscount, 2, '.', ''));
+        $set('vat_total', number_format($vatAmount, 2, '.', ''));
         $set('final_price', number_format($grandTotal, 2, '.', ''));
     }
 }
