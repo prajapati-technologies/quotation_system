@@ -275,8 +275,7 @@
                 <th>Product Description</th>
                 <th width="60">Dimensions</th>
                 <th width="30" style="text-align:center;">Qty</th>
-                <th width="70" style="text-align:right;">Goods Value</th>
-                <th width="70" style="text-align:right;">Install Fee</th>
+                <th width="80" style="text-align:right;">Price</th>
             </tr>
         </thead>
         <tbody>
@@ -287,9 +286,8 @@
                     $hVal = floatval($item->height ?? 0);
                     $area = max(1.0, ($wVal / 1000) * ($hVal / 1000));
                     $qty = intval($item->quantity ?? 1);
-                    $installFee = floatval($item->installation_rate ?? 0) * $area * $qty;
-                    
-                    // We need to show the Gross Goods Total before discount for clarity
+
+                    // Gross goods total before discount (NET is in $item->price)
                     // current $item->price is already discounted (NET)
                     $discPercent = floatval($item->discount_amount ?? 0);
                     $netPrice = floatval($item->price ?? 0);
@@ -323,7 +321,6 @@
                     </td>
                     <td style="text-align:center;">{{ $qty }}</td>
                     <td style="text-align:right;">฿{{ number_format($netPrice, 2) }}</td>
-                    <td style="text-align:right;">฿{{ number_format($installFee, 2) }}</td>
                 </tr>
             @endforeach
         </tbody>
