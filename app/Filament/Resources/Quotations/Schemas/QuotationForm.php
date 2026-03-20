@@ -105,6 +105,8 @@ class QuotationForm
                     ->addable(fn(callable $get) => auth()->user()->role === 'sales' && $get('status') === 'Draft')
                     ->disabled(fn(callable $get) => auth()->user()->role === 'admin' || $get('status') !== 'Draft')
                     ->columns(4)
+                    // ADD HYDRATION TRIGGER FOR EDIT PAGE
+                    ->afterStateHydrated(fn(callable $set, callable $get) => self::updatePrices($set, $get))
                     ->schema([
                         // Product Details
                         Placeholder::make('product_details_label')
@@ -187,7 +189,6 @@ class QuotationForm
                             ->afterStateUpdated(function (callable $set, callable $get) {
                                 $set('sub_color_id', null);
                                 
-                                // AUTO-FILL INSTALLATION RATE
                                 $productId = $get('product_id');
                                 $mainColorId = $get('color_id');
                                 if ($productId && $mainColorId) {
@@ -238,7 +239,6 @@ class QuotationForm
                             ->required()
                             ->live()
                             ->prefix('฿')
-                            ->hint('Auto-filled but editable.')
                             ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get)),
 
                         CheckboxList::make('accessories')
@@ -246,7 +246,7 @@ class QuotationForm
                             ->options(Accessory::pluck('name', 'id'))
                             ->live()
                             ->columns(2)
-                            ->columnSpan(2) // Reduced column span to fit Install Rate
+                            ->columnSpan(2)
                             ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get)),
 
                         TextInput::make('price')->label('Item Total')->numeric()->readOnly()->dehydrated()->prefix('฿'),
@@ -288,8 +288,6 @@ class QuotationForm
             $glassId = $item['glass_id'] ?? null;
             $accessoryIds = $item['accessories'] ?? [];
             $itemDiscountPercent = floatval($item['discount_amount'] ?? 0);
-            
-            // USE MANUAL OVERRIDE INSTALL RATE IF AVAILABLE
             $installRate = floatval($item['installation_rate'] ?? 0);
             
             $priceData = ProductColorPrice::where('product_id', $productId)
@@ -297,9 +295,6 @@ class QuotationForm
                 ->first();
 
             $basePrice = floatval($priceData?->price ?? 0);
-            
-            // If installRate is 0 and we haven't touched it, maybe fetch from DB to be safe
-            // But usually the form state is reliable.
 
             $widthVal = floatval($item['width'] ?? 0);
             $heightVal = floatval($item['height'] ?? 0);
@@ -325,7 +320,6 @@ class QuotationForm
             
             if ($itemGoods < 0) $itemGoods = 0;
 
-            // Calculation using the (potentially overridden) installRate
             $itemInstall = $installRate * $area * $qty;
 
             $set("items.{$key}.price", number_format($itemGoods, 2, '.', ''));

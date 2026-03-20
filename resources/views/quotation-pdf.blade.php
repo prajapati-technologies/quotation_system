@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8">
-    <title>Quotation #{{ $quotation->id }}</title>
+    <title>Quotation #{{ $quotation->quotation_number }}</title>
     <style>
         @page {
             margin: 1cm;
@@ -203,28 +203,6 @@
             opacity: 0.9;
         }
 
-        .notes-box {
-            margin-top: 40px;
-            padding: 15px;
-            background-color: #fffbeb;
-            border: 1px solid #fef3c7;
-            border-radius: 8px;
-            width: 60%;
-        }
-
-        .notes-box h4 {
-            margin: 0 0 5px 0;
-            color: #92400e;
-            font-size: 11px;
-            text-transform: uppercase;
-        }
-
-        .notes-box p {
-            margin: 0;
-            color: #b45309;
-            font-size: 10px;
-        }
-
         .footer {
             position: fixed;
             bottom: 0;
@@ -252,7 +230,7 @@
                 $logoPath = public_path('images/logo.png');
             @endphp
             @if(file_exists($logoPath))
-                <img src="{{ $logoPath }}" style="max-height: 100px; max-width: 100%; object-fit: contain;">
+                <img src="{{ $logoPath }}" style="max-height: 80px; max-width: 100%; object-fit: contain;">
             @else
                 <div style="font-size: 32px; font-weight: 800; color: #1e293b; letter-spacing: -1px;">MODA</div>
                 <div style="font-size: 10px; color: #64748b; margin-top: -5px; text-transform: uppercase; letter-spacing: 2px;">Windows & Doors</div>
@@ -279,51 +257,16 @@
             <td>
                 <div class="info-box">
                     <h3>Quotation Info</h3>
-                    <p style="margin-top: 0;"><span style="color: #64748b;">Quotation/Customer No:</span> {{ $quotation->quotation_number }}/{{ $quotation->project->customer->customer_number ?? 'N/A' }}</p>
+                    <p style="margin-top: 0;"><span style="color: #64748b;">Quotation No:</span> {{ $quotation->quotation_number }}</p>
+                    <p><span style="color: #64748b;">Customer No:</span> {{ $quotation->project->customer->customer_number ?? 'N/A' }}</p>
                     <p><span style="color: #64748b;">Date:</span> {{ $quotation->quotation_date ? \Carbon\Carbon::parse($quotation->quotation_date)->format('d M Y') : $quotation->created_at->format('d M Y') }}</p>
                     <p><span style="color: #64748b;">Project:</span> {{ $quotation->project->name ?? 'N/A' }}</p>
-                    <p><span style="color: #64748b;">Status:</span> {{ $quotation->status ?? 'Draft' }}</p>
                 </div>
             </td>
         </tr>
     </table>
 
     <div class="section-title">Schedule of Line Items</div>
-
-    @php
-        $goodsGrossTotal = 0;
-        $totalDiscountSum = 0;
-        $installationTotal = 0;
-
-        foreach ($quotation->items as $item) {
-            $itemW = floatval($item->width ?? 1);
-            $itemH = floatval($item->height ?? 1);
-            $areaSqm = ($itemW / 1000) * ($itemH / 1000);
-            $itemQty = floatval($item->quantity ?? 1);
-            
-            $percentage = floatval($item->discount ?? 0);
-            $itemPrice = floatval($item->price ?? 0);
-            
-            if ($percentage > 0 && $percentage < 100) {
-                // Since itemPrice = BaseAmount * (1 - p/100)
-                // itemDiscountTotal = BaseAmount * (p/100)
-                $itemDiscountTotal = ($itemPrice / (1 - ($percentage / 100))) * ($percentage / 100);
-            } else {
-                $itemDiscountTotal = 0;
-            }
-            $totalDiscountSum += $itemDiscountTotal;
-
-            $itemPrice = floatval($item->price ?? 0);
-            $goodsGrossTotal += ($itemPrice + $itemDiscountTotal);
-
-            $installRate = floatval($item->installation_cost ?? 0);
-            $installationTotal += ($installRate * $areaSqm) * $itemQty;
-        }
-
-        $vatPercent = floatval($quotation->vat_percent ?? 0);
-        $vatAmount = floatval($quotation->vat_amount ?? 0);
-        $finalPrice = floatval($quotation->final_price ?? 0);
-    @endphp
 
     <table class="items-table">
         <thead>
@@ -336,13 +279,38 @@
             </tr>
         </thead>
         <tbody>
+            @php 
+                $totalDiscountVal = 0;
+                $grossItemsTotal = 0;
+            @endphp
             @foreach($quotation->items as $index => $item)
                 @php
-                    $maxW = 75; $maxH = 75;
+                    $itemW = floatval($item->width ?? 1);
+                    $itemH = floatval($item->height ?? 1);
+                    $area = ($itemW / 1000) * ($itemH / 1000);
+                    $qty = floatval($item->quantity ?? 1);
+                    
+                    // Fetch Original Pricing to calculate the absolute discount
+                    $priceData = \App\Models\ProductColorPrice::where('product_id', $item->product_id)
+                        ->where('main_color_id', $item->color_id)
+                        ->first();
+                    $unitPrice = floatval($priceData?->price ?? 0);
+                    $glassPrice = floatval($item->glass?->price_per_sqm ?? 0);
+                    
+                    // Accessories Total
+                    $accPrice = 0;
+                    if($item->accessories && is_array($item->accessories)) {
+                        $accPrice = \App\Models\Accessory::whereIn('id', $item->accessories)->sum('price');
+                    }
+
+                    $itemGrossTotal = (($unitPrice + $glassPrice) * max(1.0, $area) * $qty) + ($accPrice * $qty);
+                    $grossItemsTotal += $itemGrossTotal;
+
+                    $discVal = $itemGrossTotal * (floatval($item->discount_amount ?? 0) / 100);
+                    $totalDiscountVal += $discVal;
                 @endphp
                 <tr>
                     <td style="text-align:center; color: #94a3b8; font-weight: bold;">{{ sprintf('%02d', $index + 1) }}</td>
-                    
                     <td style="text-align:center;">
                         <div class="drawing-container">
                             @php
@@ -356,30 +324,24 @@
                             @endif
                         </div>
                     </td>
-
                     <td class="item-details">
-                        <strong>{{ $item->product->name ?? ($item->product_type ?? 'N/A') }}</strong>
-                        <span>
-                            {{ $item->brand->name ?? '' }} Series — {{ $item->materialType->name ?? '' }}
-                        </span>
+                        <strong>{{ $item->product->name ?? 'N/A' }}</strong>
+                        <span>{{ $item->material->name ?? '' }} — {{ $item->materialType->name ?? '' }}</span>
                         <div style="margin-top: 6px;">
                             <span style="display: block; margin-bottom: 2px;">
-                                <i style="color: #94a3b8;">Color:</i> {{ $item->color->name ?? 'N/A' }} | 
+                                <i style="color: #94a3b8;">Finsh:</i> {{ $item->color->name ?? 'N/A' }} | 
+                                <i style="color: #94a3b8;">Sub:</i> {{ \App\Models\Color::find($item->sub_color_id)?->name ?? 'N/A' }}
+                            </span>
+                            <span style="display: block; margin-bottom: 2px;">
                                 <i style="color: #94a3b8;">Glass:</i> {{ $item->glass->name ?? 'N/A' }}
                             </span>
                             <div class="specs-badge">
-                                {{ number_format($item->width, 0) }}mm (W) × {{ number_format($item->height, 0) }}mm (H)
+                                {{ number_format($item->width, 0) }}mm (W) x {{ number_format($item->height, 0) }}mm (H)
                             </div>
                         </div>
                     </td>
-
-                    <td class="qty-column">
-                        {{ $item->quantity }}
-                    </td>
-
-                    <td class="price-column">
-                        ฿{{ number_format($item->price, 2) }}
-                    </td>
+                    <td class="qty-column">{{ $item->quantity }}</td>
+                    <td class="price-column">฿{{ number_format($item->price, 2) }}</td>
                 </tr>
             @endforeach
         </tbody>
@@ -388,44 +350,38 @@
     <div class="totals-section clearfix">
         <table class="totals-table">
             <tr>
-                <td class="label">Product Subtotal</td>
-                <td class="value">฿{{ number_format($goodsGrossTotal, 2) }}</td>
+                <td class="label">Goods Subtotal (Gross)</td>
+                <td class="value">฿{{ number_format($grossItemsTotal, 2) }}</td>
             </tr>
-            @if($totalDiscountSum > 0)
+            @if($totalDiscountVal > 0)
             <tr>
-                <td class="label discount">Discount</td>
-                <td class="value discount">- ฿{{ number_format($totalDiscountSum, 2) }}</td>
+                <td class="label discount">Item Discounts (Sum)</td>
+                <td class="value discount">- ฿{{ number_format($totalDiscountVal, 2) }}</td>
             </tr>
             @endif
             <tr>
-                <td class="label">Installation</td>
-                <td class="value">฿{{ number_format($installationTotal, 2) }}</td>
+                <td class="label">Installation Total</td>
+                <td class="value">฿{{ number_format($quotation->installation_total, 2) }}</td>
             </tr>
             <tr>
-                <td class="label">VAT ({{ number_format($vatPercent, 1) }}%)</td>
-                <td class="value">฿{{ number_format($vatAmount, 2) }}</td>
+                <td class="label">Subtotal (Net)</td>
+                <td class="value">฿{{ number_format($quotation->total_price, 2) }}</td>
+            </tr>
+            <tr>
+                <td class="label">VAT ({{ \App\Models\Setting::get('vat_percent', 7) }}%)</td>
+                <td class="value">฿{{ number_format($quotation->vat_total, 2) }}</td>
             </tr>
             <tr class="grand-total">
                 <td class="label" style="border-bottom: none;">Grand Total</td>
-                <td class="value" style="border-bottom: none;">฿{{ number_format($finalPrice, 2) }}</td>
+                <td class="value" style="border-bottom: none;">฿{{ number_format($quotation->final_price, 2) }}</td>
             </tr>
         </table>
     </div>
 
-    @if($quotation->notes)
-        <div class="notes-box">
-            <h4>Important Notes / Remarks:</h4>
-            <p>{{ $quotation->notes }}</p>
-        </div>
-    @endif
-
     <div class="footer">
         <p>This is a computer generated quotation. Valid for 30 days from issued date.</p>
-        <p>© {{ date('Y') }} Expert Window &amp; Door Solutions | All Rights Reserved</p>
+        <p>© {{ date('Y') }} MODA Windows & Doors | All Rights Reserved</p>
     </div>
-</body>
-
-</html>
 </body>
 
 </html>
