@@ -11,27 +11,15 @@ use App\Models\Accessory;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 
 class AccessoryResource extends Resource
 {
     protected static ?string $model = Accessory::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
-
-    protected static ?string $recordTitleAttribute = 'name';
-
-    public static function getNavigationGroup(): ?string
-    {
-        return 'Master Data';
-    }
-
-    protected static ?int $navigationSort = 24;
-
     public static function shouldRegisterNavigation(): bool
     {
-        return auth()->user()->role === 'admin';
+        return false;
     }
 
     public static function form(Schema $schema): Schema
@@ -44,19 +32,10 @@ class AccessoryResource extends Resource
         return AccessoriesTable::configure($table);
     }
 
-    public static function getRelations(): array
-    {
-        return [
-            //
-        ];
-    }
-
     public static function getPages(): array
     {
         return [
             'index' => ListAccessories::route('/'),
-            'create' => CreateAccessory::route('/create'),
-            'edit' => EditAccessory::route('/{record}/edit'),
         ];
     }
 }
