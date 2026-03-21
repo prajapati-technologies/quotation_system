@@ -15,6 +15,7 @@ class QuotationItem extends Model
         'height' => 'decimal:2',
         'price' => 'decimal:2',
         'discount_amount' => 'decimal:2',
+        'installation_rate' => 'decimal:2',
     ];
 
     public function quotation(): BelongsTo
