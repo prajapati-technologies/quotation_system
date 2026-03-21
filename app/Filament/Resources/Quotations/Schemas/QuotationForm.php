@@ -182,7 +182,8 @@ class QuotationForm
                                 if (!$productId) return [];
                                 return ProductColorPrice::where('product_id', $productId)
                                     ->join('colors', 'product_color_prices.main_color_id', '=', 'colors.id')
-                                    ->pluck('colors.name', 'colors.id');
+                                    ->pluck('colors.name', 'colors.id')
+                                    ->toArray();
                             })
                             ->required()
                             ->live()
@@ -212,7 +213,17 @@ class QuotationForm
                                     ->where('main_color_id', $mainColorId)
                                     ->first();
                                 
-                                return $priceRecord ? $priceRecord->subColors()->pluck('name', 'colors.id') : [];
+                                if (!$priceRecord) return [];
+
+                                // Try to get configured sub-colors first
+                                $options = $priceRecord->subColors()->pluck('colors.name', 'colors.id')->toArray();
+                                
+                                // If none are configured for this product, fallback to ALL sub-colors of the main color
+                                if (empty($options)) {
+                                    $options = Color::where('parent_id', $mainColorId)->pluck('name', 'id')->toArray();
+                                }
+
+                                return $options;
                             })
                             ->required()
                             ->live()
