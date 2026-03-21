@@ -259,17 +259,20 @@ class QuotationForm
                     ->schema([
                         Grid::make(3)
                             ->schema([
-                                TextInput::make('total_goods')->label('Goods Total')->readOnly()->dehydrated()->prefix('฿'),
-                                TextInput::make('installation_total')->label('Installation Total')->readOnly()->dehydrated()->prefix('฿'),
-                                TextInput::make('total_price')->label('Total (Before VAT)')->readOnly()->dehydrated()->prefix('฿'),
+                                TextInput::make('total_goods')->label('Goods Total')->readOnly()->dehydrated(true)->prefix('฿'),
+                                TextInput::make('installation_total')->label('Installation Total')->readOnly()->dehydrated(true)->prefix('฿'),
+                                TextInput::make('discount')->label('Total Discount')->readOnly()->dehydrated(true)->prefix('฿'),
+                                TextInput::make('total_price')->label('Total (Before VAT)')->readOnly()->dehydrated(true)->prefix('฿'),
                                 
                                 TextInput::make('vat_total')
                                     ->label('VAT (' . \App\Models\Setting::get('vat_percent', 7) . '%)')
                                     ->readOnly()
-                                    ->dehydrated()
+                                    ->dehydrated(true)
                                     ->prefix('฿'),
+
+                                Hidden::make('vat_percent')->dehydrated(true),
                                     
-                                TextInput::make('final_price')->label('Grand Total')->readOnly()->dehydrated()->prefix('฿')
+                                TextInput::make('final_price')->label('Grand Total')->readOnly()->dehydrated(true)->prefix('฿')
                                     ->extraAttributes(['class' => 'font-bold text-xl text-primary-600']),
                             ]),
                     ]),
@@ -279,8 +282,9 @@ class QuotationForm
     public static function updatePrices(callable $set, callable $get)
     {
         $items = $get('items') ?? [];
-        $totalGoods = 0;
+        $totalGrossGoods = 0;
         $totalInstallation = 0;
+        $totalDiscount = 0;
         $vatPercent = floatval(\App\Models\Setting::get('vat_percent', 7));
 
         foreach ($items as $key => $item) {
@@ -288,7 +292,9 @@ class QuotationForm
             $mainColorId = $item['color_id'] ?? null;
             $glassId = $item['glass_id'] ?? null;
             $accessoryIds = $item['accessories'] ?? [];
-            $itemDiscountPercent = floatval($item['discount_amount'] ?? 0);
+            
+            // Check both potential keys for discount percentage
+            $itemDiscountPercent = floatval($item['discount_amount'] ?? $item['discount'] ?? 0);
             $installRate = floatval($item['installation_rate'] ?? 0);
             
             $priceData = ProductColorPrice::where('product_id', $productId)
@@ -317,24 +323,28 @@ class QuotationForm
 
             $rawGoods = (($basePrice + $glassPricePerSqm) * $area * $qty) + ($accessoriesPrice * $qty);
             $discountValue = $rawGoods * ($itemDiscountPercent / 100);
-            $itemGoods = $rawGoods - $discountValue;
+            $itemGoodsNet = $rawGoods - $discountValue;
             
-            if ($itemGoods < 0) $itemGoods = 0;
+            if ($itemGoodsNet < 0) $itemGoodsNet = 0;
 
             $itemInstall = $installRate * $area * $qty;
 
-            $set("items.{$key}.price", number_format($itemGoods, 2, '.', ''));
+            // Set the item total price as the discounted price
+            $set("items.{$key}.price", number_format($itemGoodsNet, 2, '.', ''));
             
-            $totalGoods += $itemGoods;
+            $totalGrossGoods += $rawGoods;
             $totalInstallation += $itemInstall;
+            $totalDiscount += $discountValue;
         }
 
-        $totalBeforeVat = $totalGoods + $totalInstallation;
+        $totalBeforeVat = $totalGrossGoods - $totalDiscount + $totalInstallation;
         $vatAmount = $totalBeforeVat * ($vatPercent / 100);
         $grandTotal = $totalBeforeVat + $vatAmount;
 
-        $set('total_goods', number_format($totalGoods, 2, '.', ''));
+        $set('total_goods', number_format($totalGrossGoods, 2, '.', ''));
         $set('installation_total', number_format($totalInstallation, 2, '.', ''));
+        $set('discount', number_format($totalDiscount, 2, '.', ''));
+        $set('vat_percent', $vatPercent);
         $set('total_price', number_format($totalBeforeVat, 2, '.', ''));
         $set('vat_total', number_format($vatAmount, 2, '.', ''));
         $set('final_price', number_format($grandTotal, 2, '.', ''));

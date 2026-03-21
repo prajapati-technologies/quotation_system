@@ -13,6 +13,8 @@ class Quotation extends Model
         'total_goods' => 'decimal:2',
         'installation_total' => 'decimal:2',
         'total_price' => 'decimal:2',
+        'discount' => 'decimal:2',
+        'vat_percent' => 'decimal:2',
         'vat_total' => 'decimal:2',
         'final_price' => 'decimal:2',
     ];

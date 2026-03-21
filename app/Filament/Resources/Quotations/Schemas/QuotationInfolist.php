@@ -131,7 +131,7 @@ class QuotationInfolist
                                     ->formatStateUsing(fn($record) => $record->glass->name ?? 'N/A')
                                     ->disabled(),
 
-                                 TextInput::make('discount')
+                                 TextInput::make('discount_amount')
                                     ->label('Discount (%)')
                                     ->suffix('%')
                                     ->disabled(),
@@ -150,27 +150,53 @@ class QuotationInfolist
                     ->icon('heroicon-o-currency-dollar')
                     ->maxWidth(Width::Full)
                     ->columnSpanFull()
-                    ->columns(2)
+                    ->columns(3)
                     ->schema([
-                        Placeholder::make('total_goods')
+                        TextInput::make('total_goods')
                             ->label('Goods Total')
-                            ->content(fn($record) => '฿' . number_format($record->total_goods ?? 0, 2)),
+                            ->prefix('฿')
+                            ->formatStateUsing(fn ($record) => number_format(floatval($record->total_goods ?? 0), 2))
+                            ->disabled(),
 
-                        Placeholder::make('discount')
+                        TextInput::make('discount')
                             ->label('Total Discount')
-                            ->content(fn($record) => '฿' . number_format($record->discount ?? 0, 2)),
+                            ->prefix('฿')
+                            ->formatStateUsing(function ($record) {
+                                $discount = floatval($record->discount ?? 0);
+                                // Fallback calculation if database stored value is 0 but items have potential discounts
+                                if ($discount <= 0 && $record->items()->exists()) {
+                                    $calcDiscount = 0;
+                                    foreach ($record->items as $item) {
+                                        $net = floatval($item->price ?? 0);
+                                        $pct = floatval($item->discount_amount ?? 0);
+                                        if ($pct > 0 && $pct < 100) {
+                                            $gross = $net / (1 - ($pct / 100));
+                                            $calcDiscount += ($gross - $net);
+                                        }
+                                    }
+                                    $discount = $calcDiscount;
+                                }
+                                return number_format($discount, 2);
+                            })
+                            ->disabled(),
 
-                        Placeholder::make('installation_total')
+                        TextInput::make('installation_total')
                             ->label('Installation Total')
-                            ->content(fn($record) => '฿' . number_format($record->installation_total ?? 0, 2)),
+                            ->prefix('฿')
+                            ->formatStateUsing(fn ($record) => number_format(floatval($record->installation_total ?? 0), 2))
+                            ->disabled(),
 
-                        Placeholder::make('total_price')
+                        TextInput::make('total_price')
                             ->label('Subtotal (Before VAT)')
-                            ->content(fn($record) => '฿' . number_format($record->total_price, 2)),
+                            ->prefix('฿')
+                            ->formatStateUsing(fn ($record) => number_format(floatval($record->total_price ?? 0), 2))
+                            ->disabled(),
 
-                        Placeholder::make('vat_amount')
-                            ->label(fn($record) => "VAT (" . ($record->vat_percent ?? 0) . "%)")
-                            ->content(fn($record) => '฿' . number_format($record->vat_amount ?? 0, 2)),
+                        TextInput::make('vat_total')
+                            ->label('VAT')
+                            ->prefix('฿')
+                            ->formatStateUsing(fn ($record) => number_format(floatval($record->vat_total ?? 0), 2))
+                            ->disabled(),
 
                          Placeholder::make('final_price')
                             ->label('Grand Total')

@@ -26,10 +26,11 @@ class CustomerForm
 
                 TextInput::make('mobile')
                     ->label('Mobile Number')
-                    ->placeholder('Enter mobile number')
+                    ->placeholder('Enter 10-digit mobile number')
                     ->tel()
                     ->required()
-                    ->maxLength(20)
+                    ->length(10)
+                    ->numeric()
                     ->autocomplete(false),
 
                 Textarea::make('address')

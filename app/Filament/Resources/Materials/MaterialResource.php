@@ -26,6 +26,11 @@ class MaterialResource extends Resource
         return 'Master Data';
     }
 
+    public static function canViewAny(): bool
+    {
+        return auth()->check() && auth()->user()->role === 'admin';
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema
