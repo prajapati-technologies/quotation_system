@@ -6,6 +6,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Repeater;
+use Filament\Actions\Action;
 use Filament\Schemas\Schema;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Grid;
@@ -36,23 +37,32 @@ class ProductForm
 
                                     Select::make('material_type_id')
                                         ->label('Material Type Selection')
-                                        ->options(\App\Models\MaterialType::with('material')->get()->mapWithKeys(function ($item) {
+                                        ->options(\App\Models\MaterialType::with(['material', 'mainColors'])->get()->mapWithKeys(function ($item) {
                                             $materialName = $item->material->name ?? 'No Material';
-                                            return [$item->id => "{$materialName} - {$item->name}"];
+                                            $colorCount = $item->mainColors->count();
+                                            $label = "{$materialName} - {$item->name}";
+                                            if ($colorCount === 0) {
+                                                $label .= " (No colors defined)";
+                                            }
+                                            return [$item->id => $label];
                                         }))
                                         ->searchable()
                                         ->preload()
                                         ->live()
                                         ->required()
                                         ->prefixIcon('heroicon-m-cube')
-                                        ->afterStateUpdated(function ($set, $get, $state) {
+                                        ->afterStateUpdated(function ($set, $get, $state, ?\App\Models\Product $record) {
+                                            // Don't clear prices if we change back to the original material type during editing
+                                            // BUT allow it if the current configurations are empty (to fix broken data)
+                                            if ($record && $state == $record->material_type_id && !empty($get('colorPrices'))) {
+                                                return;
+                                            }
+
                                             if (!$state) {
                                                 $set('colorPrices', []);
                                                 return;
                                             }
 
-                                            // Re-populate only if it's a new material type to avoid clearing existing prices unnecessarily
-                                            // But standard behavior is to refresh if material/material-type changes.
                                             $mainColors = \App\Models\Color::where('material_type_id', $state)
                                                 ->whereNull('parent_id')
                                                 ->get();
@@ -66,7 +76,37 @@ class ProductForm
                                             })->toArray();
 
                                             $set('colorPrices', $prices);
-                                        }),
+                                        })
+                                        ->hintAction(
+                                            Action::make('syncColors')
+                                                ->label('Sync Base Colors')
+                                                ->hidden(fn ($get) => !$get('material_type_id'))
+                                                ->icon('heroicon-m-arrow-path')
+                                                ->requiresConfirmation()
+                                                ->tooltip('This will re-populate the configuration list with the latest colors for this material. Existing prices in this product will be lost.')
+                                                ->action(function ($set, $get, $state) {
+                                                    if (!$state) return;
+                                                    
+                                                    $mainColors = \App\Models\Color::where('material_type_id', $state)
+                                                        ->whereNull('parent_id')
+                                                        ->get();
+
+                                                    $prices = $mainColors->map(function ($color) {
+                                                        return [
+                                                            'main_color_id' => $color->id,
+                                                            'price' => 0,
+                                                            'installation_price' => 0,
+                                                        ];
+                                                    })->toArray();
+
+                                                    $set('colorPrices', $prices);
+                                                    
+                                                    \Filament\Notifications\Notification::make()
+                                                        ->title('Colors Synced')
+                                                        ->success()
+                                                        ->send();
+                                                })
+                                        ),
                                 ])
                         ]),
 
