@@ -114,7 +114,7 @@ class QuotationsTable
                             ->label('Partial payment receipt')
                             ->icon('heroicon-o-receipt-percent')
                             ->modalHeading('Partial payment receipt')
-                            ->modalDescription('Enter the percentage of the invoice total (incl. VAT) received. The receipt PDF will download after you save.')
+                            ->modalDescription('Invoice total (VAT sahit) ka jitna bhi % aapne liya ho yahan likho — 40, 50, 80, 90, kuch bhi 0.01% se 99.99% tak. Save ke baad partial receipt PDF download hogi.')
                             ->modalHidden(fn (\App\Models\Quotation $record): bool => $record->partial_payment_at !== null
                                 || ! self::canRecordPaymentsForQuotation($record)
                                 || $record->full_payment_at !== null)
@@ -129,7 +129,8 @@ class QuotationsTable
                                         ->maxValue(99.99)
                                         ->suffix('%')
                                         ->required()
-                                        ->helperText('Example: 40 for 40% of the final invoice amount.'),
+                                        ->placeholder('e.g. 40, 50, 80, 90')
+                                        ->helperText('Koi bhi percentage chalega (final amount ka hissa). Examples: 40, 50, 80, 90 — minimum 0.01%, maximum 99.99% (taake baaki amount baad mein full payment receipt se ho).'),
                                 ]
                                 : [])
                             ->action(function (\App\Models\Quotation $record, array $data) {
@@ -158,7 +159,13 @@ class QuotationsTable
                                 }
 
                                 $pct = (float) ($data['payment_percent'] ?? 0);
-                                if ($pct <= 0) {
+                                if ($pct < 0.01 || $pct > 99.99) {
+                                    Notification::make()
+                                        ->title('Invalid percentage')
+                                        ->body('Percentage 0.01% se 99.99% ke beech honi chahiye (jaise 80 ya 90).')
+                                        ->danger()
+                                        ->send();
+
                                     return;
                                 }
 
