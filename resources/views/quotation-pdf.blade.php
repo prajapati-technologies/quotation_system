@@ -5,33 +5,41 @@
     <meta charset="utf-8">
     @php
         $documentType = $documentType ?? 'quotation';
-        if (! in_array($documentType, ['quotation', 'invoice', 'receipt'], true)) {
+        if (! in_array($documentType, ['quotation', 'invoice', 'receipt', 'receipt_partial', 'receipt_full'], true)) {
             $documentType = 'quotation';
         }
         $docTitle = match ($documentType) {
             'invoice' => 'Invoice',
             'receipt' => 'Receipt',
+            'receipt_partial' => 'Partial payment receipt',
+            'receipt_full' => 'Full payment receipt',
             default => 'Quotation',
         };
         $docSection = match ($documentType) {
             'invoice' => 'Invoice line items',
-            'receipt' => 'Receipt line items',
+            'receipt', 'receipt_partial', 'receipt_full' => 'Receipt line items (invoice reference)',
             default => 'Quotation line items',
         };
         $dateLabel = match ($documentType) {
             'invoice' => 'Invoice date',
-            'receipt' => 'Receipt date',
+            'receipt', 'receipt_partial', 'receipt_full' => 'Receipt date',
             default => 'Quotation date',
         };
         $docFooter = match ($documentType) {
             'invoice' => 'This is a computer-generated invoice. Please pay according to the agreed terms.',
-            'receipt' => 'This is a computer-generated receipt. Thank you for your business.',
+            'receipt', 'receipt_partial', 'receipt_full' => 'This is a computer-generated receipt. Thank you for your business.',
             default => 'This is a computer-generated quotation. Valid for 30 days from the issue date.',
         };
         $grandTotalLabel = match ($documentType) {
             'invoice' => 'AMOUNT DUE',
-            'receipt' => 'TOTAL RECEIVED',
+            'receipt', 'receipt_partial', 'receipt_full' => 'TOTAL RECEIVED',
             default => 'GRAND TOTAL',
+        };
+        $pdfReceiptNo = match ($documentType) {
+            'receipt_partial' => $quotation->receipt_number_partial,
+            'receipt_full' => $quotation->receipt_number_full,
+            'receipt' => $quotation->receipt_number,
+            default => null,
         };
         $companyName = \App\Models\Setting::get('company_name', 'MODA');
         $companyTagline = \App\Models\Setting::get('company_tagline', 'Premium Window & Door Solutions');
@@ -40,7 +48,7 @@
     @endphp
     <title>{{ $docTitle }} — {{ match ($documentType) {
         'invoice' => $quotation->invoice_number,
-        'receipt' => $quotation->receipt_number,
+        'receipt', 'receipt_partial', 'receipt_full' => $pdfReceiptNo ?? $quotation->receipt_number,
         default => $quotation->quotation_number,
     } }}@if($pdfCustomer?->customer_number) ({{ $pdfCustomer->customer_number }})@endif</title>
     <style>
@@ -233,8 +241,11 @@
                 @endif
                 @if($documentType === 'invoice')
                     <p class="doc-ref-line"><span class="doc-ref-label">Invoice No.</span>{{ $quotation->invoice_number }}</p>
-                @elseif($documentType === 'receipt')
-                    <p class="doc-ref-line"><span class="doc-ref-label">Receipt No.</span>{{ $quotation->receipt_number }}</p>
+                @elseif(in_array($documentType, ['receipt', 'receipt_partial', 'receipt_full'], true))
+                    <p class="doc-ref-line"><span class="doc-ref-label">Receipt No.</span>{{ $pdfReceiptNo ?? $quotation->receipt_number }}</p>
+                    @if(in_array($documentType, ['receipt_partial', 'receipt_full'], true))
+                        <p class="doc-ref-line"><span class="doc-ref-label">Invoice ref.</span>{{ $quotation->invoice_number }}</p>
+                    @endif
                 @else
                     <p class="doc-ref-line"><span class="doc-ref-label">Quotation No.</span>{{ $quotation->quotation_number }}</p>
                 @endif
@@ -327,34 +338,85 @@
     </table>
 
     <div class="totals-section clearfix">
-        <table class="totals-table">
-            <tr>
-                <td class="label">Goods Subtotal (Gross)</td>
-                <td class="value">฿{{ number_format($grossSubTotal, 2) }}</td>
-            </tr>
-            @if($totalDisc > 0)
-            <tr>
-                <td class="label" style="color: #ef4444;">Item Discounts Total (-)</td>
-                <td class="value" style="color: #ef4444;">- ฿{{ number_format($totalDisc, 2) }}</td>
-            </tr>
-            @endif
-            <tr>
-                <td class="label">Total Installation Fees</td>
-                <td class="value">฿{{ number_format($quotation->installation_total, 2) }}</td>
-            </tr>
-            <tr style="border-top: 1px solid #333;">
-                <td class="label">Subtotal (Net)</td>
-                <td class="value">฿{{ number_format($quotation->total_price, 2) }}</td>
-            </tr>
-            <tr>
-                <td class="label">VAT ({{ \App\Models\Setting::get('vat_percent', 7) }}%)</td>
-                <td class="value">฿{{ number_format($quotation->vat_total, 2) }}</td>
-            </tr>
-            <tr class="grand-total">
-                <td class="label" style="border: none;">{{ $grandTotalLabel }}</td>
-                <td class="value" style="border: none;">฿{{ number_format($quotation->final_price, 2) }}</td>
-            </tr>
-        </table>
+        @if($documentType === 'receipt_partial')
+            @php
+                $fp = (float) $quotation->final_price;
+                $ppAmt = (float) ($quotation->partial_payment_amount ?? 0);
+                $ppPct = (float) ($quotation->partial_payment_percent ?? 0);
+            @endphp
+            <table class="totals-table">
+                <tr>
+                    <td class="label">Invoice total (incl. VAT)</td>
+                    <td class="value">฿{{ number_format($fp, 2) }}</td>
+                </tr>
+                <tr>
+                    <td class="label">This payment ({{ number_format($ppPct, 2) }}%)</td>
+                    <td class="value">฿{{ number_format($ppAmt, 2) }}</td>
+                </tr>
+                <tr class="grand-total">
+                    <td class="label" style="border: none;">TOTAL RECEIVED (this payment)</td>
+                    <td class="value" style="border: none;">฿{{ number_format($ppAmt, 2) }}</td>
+                </tr>
+            </table>
+        @elseif($documentType === 'receipt_full')
+            @php
+                $fp = (float) $quotation->final_price;
+                $ppAmt = (float) ($quotation->partial_payment_amount ?? 0);
+                $ppPct = (float) ($quotation->partial_payment_percent ?? 0);
+                $bal = (float) ($quotation->full_payment_balance_amount ?? 0);
+                $hadPartial = $quotation->partial_payment_at !== null;
+            @endphp
+            <table class="totals-table">
+                <tr>
+                    <td class="label">Invoice total (incl. VAT)</td>
+                    <td class="value">฿{{ number_format($fp, 2) }}</td>
+                </tr>
+                @if($hadPartial && $ppAmt > 0)
+                <tr>
+                    <td class="label">Prior payment ({{ number_format($ppPct, 2) }}% — {{ $quotation->receipt_number_partial }})</td>
+                    <td class="value">- ฿{{ number_format($ppAmt, 2) }}</td>
+                </tr>
+                @endif
+                <tr class="grand-total">
+                    <td class="label" style="border: none;">{{ $hadPartial ? 'BALANCE PAID (this receipt)' : 'TOTAL RECEIVED (paid in full)' }}</td>
+                    <td class="value" style="border: none;">฿{{ number_format($bal, 2) }}</td>
+                </tr>
+                @if($hadPartial)
+                <tr>
+                    <td class="label" colspan="2" style="border: none; padding-top: 8px; font-size: 9px; color: #64748b;">Invoice fully settled.</td>
+                </tr>
+                @endif
+            </table>
+        @else
+            <table class="totals-table">
+                <tr>
+                    <td class="label">Goods Subtotal (Gross)</td>
+                    <td class="value">฿{{ number_format($grossSubTotal, 2) }}</td>
+                </tr>
+                @if($totalDisc > 0)
+                <tr>
+                    <td class="label" style="color: #ef4444;">Item Discounts Total (-)</td>
+                    <td class="value" style="color: #ef4444;">- ฿{{ number_format($totalDisc, 2) }}</td>
+                </tr>
+                @endif
+                <tr>
+                    <td class="label">Total Installation Fees</td>
+                    <td class="value">฿{{ number_format($quotation->installation_total, 2) }}</td>
+                </tr>
+                <tr style="border-top: 1px solid #333;">
+                    <td class="label">Subtotal (Net)</td>
+                    <td class="value">฿{{ number_format($quotation->total_price, 2) }}</td>
+                </tr>
+                <tr>
+                    <td class="label">VAT ({{ \App\Models\Setting::get('vat_percent', 7) }}%)</td>
+                    <td class="value">฿{{ number_format($quotation->vat_total, 2) }}</td>
+                </tr>
+                <tr class="grand-total">
+                    <td class="label" style="border: none;">{{ $grandTotalLabel }}</td>
+                    <td class="value" style="border: none;">฿{{ number_format($quotation->final_price, 2) }}</td>
+                </tr>
+            </table>
+        @endif
     </div>
 
     <div class="footer" style="position: absolute; bottom: 0; width: 100%; text-align: center; border-top: 1px solid #eee; padding-top: 10px;">

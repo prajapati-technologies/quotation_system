@@ -17,6 +17,11 @@ class Quotation extends Model
         'vat_percent' => 'decimal:2',
         'vat_total' => 'decimal:2',
         'final_price' => 'decimal:2',
+        'partial_payment_percent' => 'decimal:2',
+        'partial_payment_amount' => 'decimal:2',
+        'partial_payment_at' => 'datetime',
+        'full_payment_at' => 'datetime',
+        'full_payment_balance_amount' => 'decimal:2',
     ];
 
     public function customer()
@@ -36,19 +41,29 @@ class Quotation extends Model
 
     public function getQuotationNumberAttribute()
     {
-        return 'QT' . str_pad($this->id, 4, '0', STR_PAD_LEFT);
+        return 'QT'.str_pad($this->id, 4, '0', STR_PAD_LEFT);
     }
 
     /** Invoice PDF number (paired with quotation id). */
     public function getInvoiceNumberAttribute(): string
     {
-        return 'INV' . str_pad((string) $this->id, 4, '0', STR_PAD_LEFT);
+        return 'INV'.str_pad((string) $this->id, 4, '0', STR_PAD_LEFT);
     }
 
-    /** Receipt PDF number. */
+    /** Receipt PDF number (legacy single receipt label). */
     public function getReceiptNumberAttribute(): string
     {
-        return 'RCP' . str_pad((string) $this->id, 4, '0', STR_PAD_LEFT);
+        return 'RCP'.str_pad((string) $this->id, 4, '0', STR_PAD_LEFT);
+    }
+
+    public function getReceiptNumberPartialAttribute(): string
+    {
+        return $this->receipt_number.'-P';
+    }
+
+    public function getReceiptNumberFullAttribute(): string
+    {
+        return $this->receipt_number.'-F';
     }
 
     /**
