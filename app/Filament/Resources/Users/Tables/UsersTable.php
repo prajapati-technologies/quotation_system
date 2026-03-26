@@ -39,6 +39,10 @@ class UsersTable
                     ->label('Status')
                     ->onColor('success')
                     ->offColor('danger'),
+                TextColumn::make('max_discount')
+                    ->label('Max Discount')
+                    ->suffix('%')
+                    ->sortable(),
                 TextColumn::make('created_at')
                     ->label('Joined On')
                     ->dateTime('M d, Y')

@@ -36,9 +36,18 @@ class UserForm
                             ->native(false)
                             ->default('sales'),
                         Toggle::make('is_active')
-                            ->label('Account Active')
-                            ->default(true)
-                            ->inline(false),
+                                ->label('Account Active')
+                                ->default(true)
+                                ->inline(false),
+                        TextInput::make('max_discount')
+                                ->label('Max Discount (%)')
+                                ->numeric()
+                                ->default(0)
+                                ->suffix('%')
+                                ->minValue(0)
+                                ->maxValue(100)
+                                ->helperText('Maximum discount percentage this user can offer.')
+                                ->visible(fn ($get) => $get('role') === 'sales'),
                         TextInput::make('password')
                             ->label('Access Password')
                             ->password()

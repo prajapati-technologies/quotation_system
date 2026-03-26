@@ -274,6 +274,8 @@ class QuotationForm
                             ->default(0)
                             ->live()
                             ->suffix('%')
+                            ->maxValue(fn () => auth()->user()->role === 'admin' ? 100 : (auth()->user()->max_discount ?? 0))
+                            ->helperText(fn () => auth()->user()->role === 'sales' ? "Authorized Max Discount: " . (auth()->user()->max_discount ?? 0) . "%" : null)
                             ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get)),
 
                         TextInput::make('installation_rate')
