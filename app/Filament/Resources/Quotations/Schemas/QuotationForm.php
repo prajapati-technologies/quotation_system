@@ -52,7 +52,7 @@ class QuotationForm
                                     ->required()
                                     ->label('Customer')
                                     ->prefixIcon('heroicon-o-user')
-                                    ->disabled(fn(callable $get) => $get('status') !== 'Draft' || auth()->user()->role === 'admin'),
+                                    ->disabled(fn(callable $get) => !in_array($get('status'), ['Draft', 'Approved']) || auth()->user()->role === 'admin'),
 
                                 Select::make('project_id')
                                     ->label('Project')
@@ -61,14 +61,14 @@ class QuotationForm
                                     ->preload()
                                     ->required()
                                     ->prefixIcon('heroicon-o-briefcase')
-                                    ->disabled(fn(callable $get) => $get('status') !== 'Draft' || auth()->user()->role === 'admin'),
+                                    ->disabled(fn(callable $get) => !in_array($get('status'), ['Draft', 'Approved']) || auth()->user()->role === 'admin'),
 
                                 DatePicker::make('quotation_date')
                                     ->label('Date')
                                     ->default(now())
                                     ->required()
                                     ->prefixIcon('heroicon-o-calendar')
-                                    ->disabled(fn(callable $get) => $get('status') !== 'Draft' || auth()->user()->role === 'admin'),
+                                    ->disabled(fn(callable $get) => !in_array($get('status'), ['Draft', 'Approved']) || auth()->user()->role === 'admin'),
 
                                 Select::make('status')
                                     ->label('Status')
@@ -80,8 +80,7 @@ class QuotationForm
                                         'Rejected' => 'Rejected',
                                     ])
                                     ->required()
-                                    ->default('Draft')
-                                    ->disabled(fn() => auth()->user()->role === 'sales')
+                                    ->default('Approved')
                                     ->dehydrated()
                                     ->prefixIcon('heroicon-o-check-circle'),
 
@@ -102,8 +101,8 @@ class QuotationForm
                     ->relationship()
                     ->maxWidth(\Filament\Support\Enums\Width::Full)
                     ->columnSpanFull()
-                    ->addable(fn(callable $get) => auth()->user()->role === 'sales' && $get('status') === 'Draft')
-                    ->disabled(fn(callable $get) => auth()->user()->role === 'admin' || $get('status') !== 'Draft')
+                    ->addable(fn(callable $get) => auth()->user()->role === 'sales' && in_array($get('status'), ['Draft', 'Approved']))
+                    ->disabled(fn(callable $get) => auth()->user()->role === 'admin' || !in_array($get('status'), ['Draft', 'Approved']))
                     ->columns(4)
                     // ADD HYDRATION TRIGGER FOR EDIT PAGE
                     ->afterStateHydrated(fn(callable $set, callable $get) => self::updatePrices($set, $get))
@@ -264,6 +263,59 @@ class QuotationForm
                     ])
                     ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get)),
 
+                // SECTION 2.5: MILESTONES
+                Section::make('Payment Milestones')
+                    ->description('Break down the total price into payment milestones. Total must be 100%.')
+                    ->icon('heroicon-o-banknotes')
+                    ->schema([
+                        Repeater::make('milestones')
+                            ->label('Breakdown')
+                            ->relationship('milestones')
+                            ->rules([
+                                function () {
+                                    return function (string $attribute, $value, \Closure $fail) {
+                                        $total = collect($value)->sum('percentage');
+                                        if ($total != 100) {
+                                            $fail("The total milestone percentage must be exactly 100%. Current: {$total}%");
+                                        }
+                                    };
+                                }
+                            ])
+                            ->schema([
+                                TextInput::make('label')
+                                    ->label('Milestone Name')
+                                    ->required()
+                                    ->placeholder('e.g. Down Payment, Installation')
+                                    ->columnSpan(2),
+                                TextInput::make('percentage')
+                                    ->label('Percentage (%)')
+                                    ->numeric()
+                                    ->required()
+                                    ->live()
+                                    ->suffix('%')
+                                    ->minValue(1)
+                                    ->maxValue(100)
+                                    ->afterStateUpdated(function ($state, $set, $get) {
+                                        $finalPrice = floatval($get('../../final_price'));
+                                        $set('amount', round($finalPrice * (floatval($state) / 100), 2));
+                                    })
+                                    ->columnSpan(1),
+                                TextInput::make('amount')
+                                    ->label('Amount (฿)')
+                                    ->numeric()
+                                    ->required()
+                                    ->readOnly()
+                                    ->prefix('฿')
+                                    ->columnSpan(1),
+                            ])
+                            ->columns(4)
+                            ->default([
+                                ['label' => 'Down Payment', 'percentage' => 50, 'amount' => 0],
+                                ['label' => 'Final Payment', 'percentage' => 50, 'amount' => 0],
+                            ])
+                            ->columnSpanFull()
+                    ]),
+
                 // SECTION 3: FOOTER
                 Section::make('Total Financials')
                     ->columnSpanFull()
@@ -359,5 +411,12 @@ class QuotationForm
         $set('total_price', number_format($totalBeforeVat, 2, '.', ''));
         $set('vat_total', number_format($vatAmount, 2, '.', ''));
         $set('final_price', number_format($grandTotal, 2, '.', ''));
+
+        // Recalculate milestone amounts
+        $milestones = $get('milestones') ?? [];
+        foreach ($milestones as $key => $milestone) {
+            $pct = floatval($milestone['percentage'] ?? 0);
+            $set("milestones.{$key}.amount", round($grandTotal * ($pct / 100), 2));
+        }
     }
 }

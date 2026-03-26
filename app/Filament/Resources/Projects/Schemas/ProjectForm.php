@@ -24,6 +24,7 @@ class ProjectForm
                     ])
                     ->required(),
                 DatePicker::make('expected_delivery_date')
+                    ->label('Expiry Date')
                     ->required(),
             ]);
     }

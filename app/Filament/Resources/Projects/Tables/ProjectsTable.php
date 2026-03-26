@@ -24,6 +24,7 @@ class ProjectsTable
                 TextColumn::make('type')
                     ->searchable(),
                 TextColumn::make('expected_delivery_date')
+                    ->label('Expiry Date')
                     ->date()
                     ->sortable(),
                 TextColumn::make('created_at')

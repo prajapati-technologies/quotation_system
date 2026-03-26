@@ -9,6 +9,8 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Placeholder;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Columns\TextColumn;
@@ -39,8 +41,15 @@ class QuotationsTable
 
                 TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->formatStateUsing(function (string $state, \App\Models\Quotation $record): string {
+                        if (auth()->user()->role === 'sales' && $record->milestones()->where('status', 'Paid')->exists()) {
+                            return 'Waiting for admin approval';
+                        }
+                        return $state;
+                    })
+                    ->color(fn (string $state, $record): string => match ($state === 'Approved' && auth()->user()->role === 'sales' && $record->milestones()->where('status', 'Paid')->exists() ? 'WaitAdmin' : $state) {
                         'Draft' => 'gray',
+                        'WaitAdmin' => 'warning',
                         'Signed' => 'info',
                         'Approved' => 'success',
                         'Production' => 'warning',
@@ -48,8 +57,9 @@ class QuotationsTable
                         'Rejected' => 'danger',
                         default => 'gray',
                     })
-                    ->icon(fn (string $state): string => match ($state) {
+                    ->icon(fn (string $state, $record): string => match ($state === 'Approved' && auth()->user()->role === 'sales' && $record->milestones()->where('status', 'Paid')->exists() ? 'WaitAdmin' : $state) {
                         'Draft' => 'heroicon-o-document',
+                        'WaitAdmin' => 'heroicon-o-clock',
                         'Signed' => 'heroicon-o-pencil-square',
                         'Approved' => 'heroicon-o-check-circle',
                         'Production' => 'heroicon-o-wrench-screwdriver',
@@ -99,7 +109,7 @@ class QuotationsTable
                         ->modalWidth('7xl'),
 
                     EditAction::make()
-                        ->visible(fn (\App\Models\Quotation $record) => auth()->user()->role === 'sales' && $record->status === 'Draft'),
+                        ->visible(fn (\App\Models\Quotation $record) => auth()->user()->role === 'sales' && in_array($record->status, ['Draft', 'Approved'])),
 
                     ActionGroup::make([
                         Action::make('downloadQuotationPdf')
@@ -110,115 +120,106 @@ class QuotationsTable
                             ->label('Invoice')
                             ->icon('heroicon-o-document-currency-dollar')
                             ->action(fn (\App\Models\Quotation $record) => self::downloadPdf($record, 'invoice')),
-                        Action::make('pdfPartialPaymentReceipt')
-                            ->label('Partial payment receipt')
-                            ->icon('heroicon-o-receipt-percent')
-                            ->modalHeading('Partial payment receipt')
-                            ->modalDescription('Invoice total (VAT sahit) ka jitna bhi % aapne liya ho yahan likho — 40, 50, 80, 90, kuch bhi 0.01% se 99.99% tak. Save ke baad partial receipt PDF download hogi.')
-                            ->modalHidden(fn (\App\Models\Quotation $record): bool => $record->partial_payment_at !== null
-                                || ! self::canRecordPaymentsForQuotation($record)
-                                || $record->full_payment_at !== null)
-                            ->form(fn (\App\Models\Quotation $record): array => $record->partial_payment_at === null
-                                && self::canRecordPaymentsForQuotation($record)
-                                && $record->full_payment_at === null
-                                ? [
-                                    TextInput::make('payment_percent')
-                                        ->label('Payment percentage')
-                                        ->numeric()
-                                        ->minValue(0.01)
-                                        ->maxValue(99.99)
-                                        ->suffix('%')
-                                        ->required()
-                                        ->placeholder('e.g. 40, 50, 80, 90')
-                                        ->helperText('Koi bhi percentage chalega (final amount ka hissa). Examples: 40, 50, 80, 90 — minimum 0.01%, maximum 99.99% (taake baaki amount baad mein full payment receipt se ho).'),
-                                ]
-                                : [])
-                            ->action(function (\App\Models\Quotation $record, array $data) {
-                                if ($record->partial_payment_at !== null) {
-                                    return self::downloadPdf($record, 'receipt_partial');
+                        
+                        Action::make('milestonePayments')
+                            ->label('Milestone Payments')
+                            ->icon('heroicon-o-currency-dollar')
+                            ->color('info')
+                            ->modalHeading('Milestone Payments & Receipts')
+                            ->modalWidth('6xl')
+                            ->fillForm(fn ($record) => [
+                                'milestones' => $record->milestones->toArray(),
+                            ])
+                            ->form(fn ($record) => [
+                                \Filament\Forms\Components\Repeater::make('milestones')
+                                    ->relationship('milestones')
+                                    ->addable(false)
+                                    ->deletable(false)
+                                    ->columns(5)
+                                    ->schema([
+                                        TextInput::make('label')
+                                            ->label('Milestone')
+                                            ->readOnly(),
+                                        TextInput::make('amount')
+                                            ->label('Amount')
+                                            ->readOnly()
+                                            ->prefix('฿'),
+                                        TextInput::make('status')
+                                            ->label('Status')
+                                            ->readOnly()
+                                            ->formatStateUsing(fn ($state) => $state === 'Paid' ? 'Waiting for admin approval' : $state)
+                                            ->extraAttributes(fn ($state) => [
+                                                'class' => match($state) {
+                                                    'Paid' => 'text-warning-600 font-bold',
+                                                    'Approved' => 'text-success-600 font-bold',
+                                                    'Rejected' => 'text-danger-600 font-bold',
+                                                    default => 'text-gray-500',
+                                                }
+                                            ]),
+                                        \Filament\Forms\Components\FileUpload::make('receipt_path')
+                                            ->label('Upload Receipt')
+                                            ->disk('public')
+                                            ->directory('receipts')
+                                            ->visibility('public')
+                                            ->visible(fn ($get) => auth()->user()->role === 'sales' && in_array($get('status'), ['Pending', 'Rejected'])),
+                                        Placeholder::make('receipt_link')
+                                            ->label('Receipt File')
+                                            ->content(fn($get) => filled($get('receipt_path')) 
+                                                ? new \Illuminate\Support\HtmlString('<a href="'.asset('storage/'.$get('receipt_path')).'" target="_blank" class="text-primary-600 underline font-bold">View Receipt</a>')
+                                                : 'No receipt uploaded')
+                                            ->visible(fn($get) => filled($get('receipt_path'))),
+                                        Select::make('admin_action')
+                                            ->label('Admin Action')
+                                            ->options([
+                                                'Approved' => 'Approve',
+                                                'Rejected' => 'Reject',
+                                            ])
+                                            ->visible(fn ($get) => auth()->user()->role === 'admin' && $get('status') === 'Paid'),
+                                    ])
+                            ])
+                            ->action(function ($record, array $data) {
+                                foreach ($data['milestones'] as $mItem) {
+                                    $milestone = \App\Models\QuotationMilestone::find($mItem['id']);
+                                    if (!$milestone) continue;
+
+                                    // Sales user uploading receipt
+                                    if (auth()->user()->role === 'sales' && filled($mItem['receipt_path']) && $milestone->receipt_path !== $mItem['receipt_path']) {
+                                        $milestone->update([
+                                            'receipt_path' => $mItem['receipt_path'],
+                                            'status' => 'Paid',
+                                            'paid_at' => now(),
+                                        ]);
+                                    }
+
+                                    // Admin approving/rejecting
+                                    if (auth()->user()->role === 'admin' && filled($mItem['admin_action'])) {
+                                        $milestone->update([
+                                            'status' => $mItem['admin_action'],
+                                            'approved_at' => $mItem['admin_action'] === 'Approved' ? now() : null,
+                                            'approved_by' => $mItem['admin_action'] === 'Approved' ? auth()->id() : null,
+                                        ]);
+                                    }
                                 }
+                                
+                                Notification::make()
+                                    ->title('Payments Updated')
+                                    ->success()
+                                    ->send();
+                            }),
 
-                                if ($record->full_payment_at !== null) {
-                                    Notification::make()
-                                        ->title('No partial payment receipt')
-                                        ->body('This invoice was paid in full without a recorded partial payment, so there is no partial receipt to download.')
-                                        ->warning()
-                                        ->send();
-
-                                    return;
-                                }
-
-                                if (! self::canRecordPaymentsForQuotation($record)) {
-                                    Notification::make()
-                                        ->title('Not available yet')
-                                        ->body('Approve this quotation first (status: Approved, Production, or Completed). Then you can record a partial payment and download the receipt.')
-                                        ->warning()
-                                        ->send();
-
-                                    return;
-                                }
-
-                                $pct = (float) ($data['payment_percent'] ?? 0);
-                                if ($pct < 0.01 || $pct > 99.99) {
-                                    Notification::make()
-                                        ->title('Invalid percentage')
-                                        ->body('Percentage 0.01% se 99.99% ke beech honi chahiye (jaise 80 ya 90).')
-                                        ->danger()
-                                        ->send();
-
-                                    return;
-                                }
-
-                                $final = (float) $record->final_price;
-                                $amount = round($final * ($pct / 100), 2);
-                                $record->update([
-                                    'partial_payment_percent' => $pct,
-                                    'partial_payment_amount' => $amount,
-                                    'partial_payment_at' => now(),
-                                ]);
-
-                                return self::downloadPdf($record->fresh(), 'receipt_partial');
-                            })
-                            ->successNotificationTitle(null),
-                        Action::make('pdfFullPaymentReceipt')
-                            ->label('Full payment receipt')
-                            ->icon('heroicon-o-banknotes')
-                            ->modalHeading('Record full payment')
-                            ->modalDescription(fn (\App\Models\Quotation $record): string => $record->partial_payment_at !== null
-                                ? 'This records the remaining balance and downloads the full payment receipt PDF.'
-                                : 'This records payment for the entire invoice (no prior partial payment) and downloads the receipt PDF.')
-                            ->modalHidden(fn (\App\Models\Quotation $record): bool => $record->full_payment_at !== null
-                                || ! self::canRecordPaymentsForQuotation($record))
-                            ->requiresConfirmation(fn (\App\Models\Quotation $record): bool => $record->full_payment_at === null
-                                && self::canRecordPaymentsForQuotation($record))
-                            ->action(function (\App\Models\Quotation $record) {
-                                if ($record->full_payment_at !== null) {
-                                    return self::downloadPdf($record, 'receipt_full');
-                                }
-
-                                if (! self::canRecordPaymentsForQuotation($record)) {
-                                    Notification::make()
-                                        ->title('Not available yet')
-                                        ->body('Approve this quotation first (status: Approved, Production, or Completed). Then you can record full payment and download the receipt.')
-                                        ->warning()
-                                        ->send();
-
-                                    return;
-                                }
-
-                                $final = (float) $record->final_price;
-                                $partial = (float) ($record->partial_payment_amount ?? 0);
-                                $balance = round(max(0, $final - $partial), 2);
-                                $record->update([
-                                    'full_payment_at' => now(),
-                                    'full_payment_balance_amount' => $balance,
-                                ]);
-
-                                return self::downloadPdf($record->fresh(), 'receipt_full');
-                            })
-                            ->successNotificationTitle(null),
+                        Action::make('downloadMilestoneReceipt')
+                            ->label('Download Milestone Receipt')
+                            ->icon('heroicon-o-receipt-refund')
+                            ->modalHeading('Download Approved Milestone Receipt')
+                            ->form(fn ($record) => [
+                                Select::make('milestone_id')
+                                    ->label('Select Milestone')
+                                    ->options($record->milestones()->where('status', 'Approved')->pluck('label', 'id'))
+                                    ->required()
+                            ])
+                            ->action(fn ($record, $data) => self::downloadPdf($record, 'receipt_milestone', (int)$data['milestone_id'])),
                     ])
-                        ->label('PDF')
+                        ->label('PDF & Payments')
                         ->icon('heroicon-o-arrow-down-tray')
                         ->color('gray')
                         ->button(),
@@ -296,11 +297,15 @@ class QuotationsTable
         return in_array($record->status, ['Approved', 'Production', 'Completed'], true);
     }
 
-    public static function downloadPdf(\App\Models\Quotation $quotation, string $documentType = 'quotation'): \Symfony\Component\HttpFoundation\StreamedResponse
+    public static function downloadPdf(\App\Models\Quotation $quotation, string $documentType = 'quotation', ?int $milestoneId = null): \Symfony\Component\HttpFoundation\StreamedResponse
     {
-        $documentType = in_array($documentType, ['quotation', 'invoice', 'receipt_partial', 'receipt_full'], true)
+        $documentType = in_array($documentType, ['quotation', 'invoice', 'receipt_partial', 'receipt_full', 'receipt_milestone'], true)
             ? $documentType
             : 'quotation';
+
+        if ($documentType === 'receipt_milestone' && !$milestoneId) {
+            abort(400, 'Milestone ID is required for milestone receipt.');
+        }
 
         if ($documentType === 'receipt_partial' && $quotation->partial_payment_at === null) {
             abort(404, 'Partial payment has not been recorded for this quotation.');
@@ -321,6 +326,7 @@ class QuotationsTable
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('quotation-pdf', [
             'quotation' => $quotation,
             'documentType' => $documentType,
+            'milestoneId' => $milestoneId,
         ]);
 
         $fileStem = match ($documentType) {

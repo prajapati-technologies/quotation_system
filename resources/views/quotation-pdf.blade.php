@@ -5,40 +5,39 @@
     <meta charset="utf-8">
     @php
         $documentType = $documentType ?? 'quotation';
-        if (! in_array($documentType, ['quotation', 'invoice', 'receipt', 'receipt_partial', 'receipt_full'], true)) {
+        if (! in_array($documentType, ['quotation', 'invoice', 'receipt', 'receipt_partial', 'receipt_full', 'receipt_milestone'], true)) {
             $documentType = 'quotation';
         }
         $docTitle = match ($documentType) {
             'invoice' => 'Invoice',
-            'receipt' => 'Receipt',
-            'receipt_partial' => 'Partial payment receipt',
-            'receipt_full' => 'Full payment receipt',
+            'receipt', 'receipt_partial', 'receipt_full', 'receipt_milestone' => 'Receipt',
             default => 'Quotation',
         };
         $docSection = match ($documentType) {
             'invoice' => 'Invoice line items',
-            'receipt', 'receipt_partial', 'receipt_full' => 'Receipt line items (invoice reference)',
+            'receipt', 'receipt_partial', 'receipt_full', 'receipt_milestone' => 'Receipt line items (invoice reference)',
             default => 'Quotation line items',
         };
         $dateLabel = match ($documentType) {
             'invoice' => 'Invoice date',
-            'receipt', 'receipt_partial', 'receipt_full' => 'Receipt date',
+            'receipt', 'receipt_partial', 'receipt_full', 'receipt_milestone' => 'Receipt date',
             default => 'Quotation date',
         };
         $docFooter = match ($documentType) {
             'invoice' => 'This is a computer-generated invoice. Please pay according to the agreed terms.',
-            'receipt', 'receipt_partial', 'receipt_full' => 'This is a computer-generated receipt. Thank you for your business.',
+            'receipt', 'receipt_partial', 'receipt_full', 'receipt_milestone' => 'This is a computer-generated receipt. Thank you for your business.',
             default => 'This is a computer-generated quotation. Valid for 30 days from the issue date.',
         };
         $grandTotalLabel = match ($documentType) {
             'invoice' => 'AMOUNT DUE',
-            'receipt', 'receipt_partial', 'receipt_full' => 'TOTAL RECEIVED',
+            'receipt', 'receipt_partial', 'receipt_full', 'receipt_milestone' => 'TOTAL RECEIVED',
             default => 'GRAND TOTAL',
         };
         $pdfReceiptNo = match ($documentType) {
             'receipt_partial' => $quotation->receipt_number_partial,
             'receipt_full' => $quotation->receipt_number_full,
             'receipt' => $quotation->receipt_number,
+            'receipt_milestone' => ($quotation->receipt_number ?? 'RCP'.str_pad($quotation->id, 4, '0', STR_PAD_LEFT)).'-M'.$milestoneId,
             default => null,
         };
         $companyName = \App\Models\Setting::get('company_name', 'MODA');
@@ -386,6 +385,26 @@
                     <td class="label" colspan="2" style="border: none; padding-top: 8px; font-size: 9px; color: #64748b;">Invoice fully settled.</td>
                 </tr>
                 @endif
+            </table>
+        @elseif($documentType === 'receipt_milestone')
+            @php
+                $milestone = $quotation->milestones()->find($milestoneId);
+                $mAmt = (float) ($milestone->amount ?? 0);
+                $mPct = (float) ($milestone->percentage ?? 0);
+            @endphp
+            <table class="totals-table">
+                <tr>
+                    <td class="label">Invoice total (incl. VAT)</td>
+                    <td class="value">฿{{ number_format($quotation->final_price, 2) }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Milestone: {{ $milestone->label ?? 'N/A' }} ({{ number_format($mPct, 2) }}%)</td>
+                    <td class="value">฿{{ number_format($mAmt, 2) }}</td>
+                </tr>
+                <tr class="grand-total">
+                    <td class="label" style="border: none;">TOTAL RECEIVED (this milestone)</td>
+                    <td class="value" style="border: none;">฿{{ number_format($mAmt, 2) }}</td>
+                </tr>
             </table>
         @else
             <table class="totals-table">
