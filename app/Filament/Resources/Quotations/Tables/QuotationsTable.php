@@ -161,7 +161,8 @@ class QuotationsTable
                                             ->disk('public')
                                             ->directory('receipts')
                                             ->visibility('public')
-                                            ->visible(fn ($get) => auth()->user()->role === 'sales' && in_array($get('status'), ['Pending', 'Rejected'])),
+                                            ->visible(fn ($get) => auth()->user()->role === 'sales' && in_array($get('status'), ['Pending', 'Rejected']))
+                                            ->helperText(fn() => auth()->user()->role === 'sales' ? 'Note: You MUST click Submit below after uploading the receipt to update the status.' : null),
                                         Placeholder::make('receipt_link')
                                             ->label('Receipt File')
                                             ->content(fn($get) => filled($get('receipt_path')) 
@@ -170,34 +171,67 @@ class QuotationsTable
                                             ->visible(fn($get) => filled($get('receipt_path'))),
                                         Select::make('admin_action')
                                             ->label('Admin Action')
+                                            ->placeholder('Process Payment...')
                                             ->options([
                                                 'Approved' => 'Approve',
                                                 'Rejected' => 'Reject',
                                             ])
-                                            ->visible(fn ($get) => auth()->user()->role === 'admin' && $get('status') === 'Paid'),
+                                            ->visible(fn ($get) => auth()->user()->role === 'admin' && filled($get('receipt_path'))),
+                                        Placeholder::make('download_note')
+                                            ->label('Action')
+                                            ->visible(fn($get) => auth()->user()->role === 'admin' && $get('status') === 'Approved')
+                                            ->content('Milestone approved! Close this and use the "Download Milestone Receipt" action to get the invoice.'),
                                     ])
                             ])
                             ->action(function ($record, array $data) {
-                                foreach ($data['milestones'] as $mItem) {
+                                $milestonesData = $data['milestones'] ?? [];
+                                foreach ($milestonesData as $mItem) {
                                     $milestone = \App\Models\QuotationMilestone::find($mItem['id']);
                                     if (!$milestone) continue;
 
                                     // Sales user uploading receipt
-                                    if (auth()->user()->role === 'sales' && filled($mItem['receipt_path']) && $milestone->receipt_path !== $mItem['receipt_path']) {
-                                        $milestone->update([
-                                            'receipt_path' => $mItem['receipt_path'],
-                                            'status' => 'Paid',
-                                            'paid_at' => now(),
-                                        ]);
+                                    if (auth()->user()->role === 'sales' && filled($mItem['receipt_path'])) {
+                                        // Only update if status is Pending or Rejected
+                                        if (in_array($milestone->status, ['Pending', 'Rejected'])) {
+                                            $milestone->update([
+                                                'receipt_path' => $mItem['receipt_path'],
+                                                'status' => 'Paid',
+                                                'paid_at' => now(),
+                                            ]);
+
+                                            // Notify Admins
+                                            $admins = \App\Models\User::where('role', 'admin')->get();
+                                            $salesPerson = auth()->user()->name;
+                                            $quotationNo = $record->quotation_number;
+                                            
+                                            \Filament\Notifications\Notification::make()
+                                                ->title('Payment Receipt Uploaded')
+                                                ->body("{$salesPerson} uploaded a receipt for {$milestone->label} (Quotation: {$quotationNo})")
+                                                ->icon('heroicon-o-currency-dollar')
+                                                ->color('info')
+                                                ->sendToDatabase($admins);
+                                        }
                                     }
 
                                     // Admin approving/rejecting
-                                    if (auth()->user()->role === 'admin' && filled($mItem['admin_action'])) {
+                                    $adminAction = $mItem['admin_action'] ?? null;
+                                    if (auth()->user()->role === 'admin' && filled($adminAction)) {
                                         $milestone->update([
-                                            'status' => $mItem['admin_action'],
-                                            'approved_at' => $mItem['admin_action'] === 'Approved' ? now() : null,
-                                            'approved_by' => $mItem['admin_action'] === 'Approved' ? auth()->id() : null,
+                                            'status' => $adminAction,
+                                            'approved_at' => $adminAction === 'Approved' ? now() : null,
+                                            'approved_by' => $adminAction === 'Approved' ? auth()->id() : null,
                                         ]);
+
+                                        // Notify Sales User
+                                        $salesUser = $record->project?->customer?->user ?? $record->customer?->user;
+                                        if ($salesUser) {
+                                            \Filament\Notifications\Notification::make()
+                                                ->title($adminAction === 'Approved' ? 'Payment Approved' : 'Payment Rejected')
+                                                ->body("Your payment for {$milestone->label} has been {$adminAction}. (Quotation: {$record->quotation_number})")
+                                                ->icon($adminAction === 'Approved' ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
+                                                ->color($adminAction === 'Approved' ? 'success' : 'danger')
+                                                ->sendToDatabase($salesUser);
+                                        }
                                     }
                                 }
                                 

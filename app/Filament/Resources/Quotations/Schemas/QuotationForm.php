@@ -448,10 +448,13 @@ class QuotationForm
         $set('final_price', number_format($grandTotal, 2, '.', ''));
 
         // Recalculate milestone amounts
-        $milestones = $get('milestones') ?? [];
-        foreach ($milestones as $key => $milestone) {
-            $pct = floatval($milestone['percentage'] ?? 0);
-            $set("milestones.{$key}.amount", round($grandTotal * ($pct / 100), 2));
+        $milestones = $get('milestones');
+        if (is_array($milestones)) {
+            foreach ($milestones as $key => $milestone) {
+                if (!is_array($milestone)) continue;
+                $pct = floatval($milestone['percentage'] ?? 0);
+                $set("milestones.{$key}.amount", round($grandTotal * ($pct / 100), 2));
+            }
         }
     }
 }

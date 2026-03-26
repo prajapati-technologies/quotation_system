@@ -23,6 +23,20 @@ class QuotationResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
+    public static function getNavigationBadge(): ?string
+    {
+        if (auth()->check() && auth()->user()->role === 'admin') {
+            $count = \App\Models\Quotation::whereHas('milestones', fn($q) => $q->where('status', 'Paid'))->count();
+            return $count > 0 ? (string)$count : null;
+        }
+        return null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'warning';
+    }
+
     public static function getNavigationGroup(): ?string
     {
         return null;
