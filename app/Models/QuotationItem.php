@@ -62,4 +62,9 @@ class QuotationItem extends Model
     {
         return $this->belongsTo(Color::class);
     }
+
+    public function subColor(): BelongsTo
+    {
+        return $this->belongsTo(Color::class, 'sub_color_id');
+    }
 }

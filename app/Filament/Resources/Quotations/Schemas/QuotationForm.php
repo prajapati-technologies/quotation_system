@@ -170,12 +170,12 @@ class QuotationForm
                         // Finishes & Options
                         Placeholder::make('finishes_label')
                             ->label('Finishes & Options')
-                            ->content('Main Color → Sub Color → Glass')
+                            ->content('Frame Colour → Sub Color → Glass')
                             ->extraAttributes(['class' => 'font-bold text-sm text-gray-500 mb-1 border-b pb-1 mt-4'])
                             ->columnSpanFull(),
 
                         Select::make('color_id') 
-                            ->label('Main Color')
+                            ->label('Frame Colour')
                             ->options(function (callable $get) {
                                 $productId = $get('product_id');
                                 if (!$productId) return [];
@@ -203,12 +203,13 @@ class QuotationForm
 
                         Select::make('sub_color_id')
                             ->label('Sub Color')
+                            ->relationship('subColor', 'name')
                             ->options(function (callable $get) {
                                 $productId = $get('product_id');
                                 $mainColorId = $get('color_id');
                                 if (!$productId || !$mainColorId) return [];
                                 
-                                $priceRecord = ProductColorPrice::where('product_id', $productId)
+                                $priceRecord = \App\Models\ProductColorPrice::where('product_id', $productId)
                                     ->where('main_color_id', $mainColorId)
                                     ->first();
                                 
@@ -219,11 +220,23 @@ class QuotationForm
                                 
                                 // If none are configured for this product, fallback to ALL sub-colors of the main color
                                 if (empty($options)) {
-                                    $options = Color::where('parent_id', $mainColorId)->pluck('name', 'id')->toArray();
+                                    $options = \App\Models\Color::where('parent_id', $mainColorId)->pluck('name', 'id')->toArray();
                                 }
 
                                 return $options;
                             })
+                            ->createOptionForm([
+                                Hidden::make('material_type_id')
+                                    ->default(fn (callable $get) => $get('material_type_id')),
+                                Hidden::make('parent_id')
+                                    ->default(fn (callable $get) => $get('color_id')),
+                                TextInput::make('name')
+                                    ->label('Sub Color Name')
+                                    ->required(),
+                                TextInput::make('additional_price')
+                                    ->numeric()
+                                    ->default(0)
+                            ])
                             ->required()
                             ->live()
                             ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get)),

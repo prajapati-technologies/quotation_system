@@ -16,10 +16,12 @@ class ProjectsTable
     {
         return $table
             ->columns([
-                TextColumn::make('customer_id')
-                    ->numeric()
-                    ->sortable(),
+                TextColumn::make('customer.name')
+                    ->label('Customer Name')
+                    ->sortable()
+                    ->searchable(),
                 TextColumn::make('name')
+                    ->label('Project Name')
                     ->searchable(),
                 TextColumn::make('type')
                     ->searchable(),

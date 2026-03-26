@@ -13,14 +13,21 @@ class ProjectForm
         return $schema
             ->components([
                 \Filament\Forms\Components\Select::make('customer_id')
+                    ->label('Customer Name')
                     ->relationship('customer', 'name', modifyQueryUsing: fn ($query) => auth()->user()->role === 'sales' ? $query->where('user_id', auth()->id()) : $query)
+                    ->searchable()
+                    ->preload()
                     ->required(),
                 TextInput::make('name')
+                    ->label('Project Name')
                     ->required(),
                 \Filament\Forms\Components\Select::make('type')
                     ->options([
-                        'New' => 'New',
-                        'Renovation' => 'Renovation',
+                        'New home' => 'New home',
+                        'Renovation home' => 'Renovation home',
+                        'Construction company' => 'Construction company',
+                        'Developer' => 'Developer',
+                        'Resaler' => 'Resaler',
                     ])
                     ->required(),
                 DatePicker::make('expected_delivery_date')
