@@ -68,7 +68,8 @@ class QuotationForm
                                     ->default(now())
                                     ->required()
                                     ->prefixIcon('heroicon-o-calendar')
-                                    ->disabled(fn(callable $get) => !in_array($get('status'), ['Draft', 'Approved']) || auth()->user()->role === 'admin'),
+                                    ->disabled()
+                                    ->dehydrated(),
 
                                 Select::make('status')
                                     ->label('Status')
@@ -162,8 +163,8 @@ class QuotationForm
                             }),
 
                         // Dimensions
-                        TextInput::make('width')->label('Width (mm)')->numeric()->default(1000)->required()->live(),
-                        TextInput::make('height')->label('Height (mm)')->numeric()->default(1000)->required()->live(),
+                        TextInput::make('width')->label('Width (mm)')->numeric()->default(1000)->minValue(500)->required()->live(),
+                        TextInput::make('height')->label('Height (mm)')->numeric()->default(1000)->minValue(500)->required()->live(),
                         TextInput::make('quantity')->label('Qty')->numeric()->default(1)->required()->live(),
                         TextInput::make('classification')->label('Class')->default('NORMAL')->disabled()->dehydrated(),
 

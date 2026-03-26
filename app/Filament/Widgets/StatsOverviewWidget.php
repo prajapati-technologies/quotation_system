@@ -37,14 +37,26 @@ class StatsOverviewWidget extends BaseWidget
             // Sales user - only their data
             $totalCustomers = Customer::where('user_id', $user->id)->count();
             $totalProjects = Project::whereHas('customer', fn($q) => $q->where('user_id', $user->id))->count();
-            $totalQuotations = Quotation::whereHas('project.customer', fn($q) => $q->where('user_id', $user->id))->count();
-            $totalRevenue = Quotation::whereHas('project.customer', fn($q) => $q->where('user_id', $user->id))
+            $totalQuotations = Quotation::where(function ($q) use ($user) {
+                $q->whereHas('project.customer', fn($q2) => $q2->where('user_id', $user->id))
+                  ->orWhereHas('customer', fn($q2) => $q2->where('user_id', $user->id));
+            })->count();
+            $totalRevenue = Quotation::where(function ($q) use ($user) {
+                $q->whereHas('project.customer', fn($q2) => $q2->where('user_id', $user->id))
+                  ->orWhereHas('customer', fn($q2) => $q2->where('user_id', $user->id));
+            })
                 ->whereIn('status', ['Approved', 'Production', 'Completed'])
                 ->sum('final_price');
-            $pendingQuotations = Quotation::whereHas('project.customer', fn($q) => $q->where('user_id', $user->id))
+            $pendingQuotations = Quotation::where(function ($q) use ($user) {
+                $q->whereHas('project.customer', fn($q2) => $q2->where('user_id', $user->id))
+                  ->orWhereHas('customer', fn($q2) => $q2->where('user_id', $user->id));
+            })
                 ->where('status', 'Draft')
                 ->count();
-            $completedProjects = Quotation::whereHas('project.customer', fn($q) => $q->where('user_id', $user->id))
+            $completedProjects = Quotation::where(function ($q) use ($user) {
+                $q->whereHas('project.customer', fn($q2) => $q2->where('user_id', $user->id))
+                  ->orWhereHas('customer', fn($q2) => $q2->where('user_id', $user->id));
+            })
                 ->where('status', 'Completed')
                 ->count();
 
