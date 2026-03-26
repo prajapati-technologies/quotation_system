@@ -391,18 +391,34 @@
                 $milestone = $quotation->milestones()->find($milestoneId);
                 $mAmt = (float) ($milestone->amount ?? 0);
                 $mPct = (float) ($milestone->percentage ?? 0);
+                
+                // Calculate total paid so far (Sum of all approved milestones)
+                $totalPaid = (float) $quotation->milestones()
+                    ->where('status', 'Approved')
+                    ->sum('amount');
+                
+                $totalPrice = (float) $quotation->final_price;
+                $remainingBalance = max(0, $totalPrice - $totalPaid);
             @endphp
             <table class="totals-table">
                 <tr>
                     <td class="label">Invoice total (incl. VAT)</td>
-                    <td class="value">฿{{ number_format($quotation->final_price, 2) }}</td>
+                    <td class="value">฿{{ number_format($totalPrice, 2) }}</td>
                 </tr>
                 <tr>
                     <td class="label">Milestone: {{ $milestone->label ?? 'N/A' }} ({{ number_format($mPct, 2) }}%)</td>
                     <td class="value">฿{{ number_format($mAmt, 2) }}</td>
                 </tr>
+                <tr>
+                    <td class="label">Total Paid So Far</td>
+                    <td class="value">฿{{ number_format($totalPaid, 2) }}</td>
+                </tr>
                 <tr class="grand-total">
-                    <td class="label" style="border: none;">TOTAL RECEIVED (this milestone)</td>
+                    <td class="label" style="border: none; background: #22c55e;">REMAINING DUE</td>
+                    <td class="value" style="border: none; background: #22c55e;">฿{{ number_format($remainingBalance, 2) }}</td>
+                </tr>
+                <tr class="grand-total">
+                    <td class="label" style="border: none;">TOTAL RECEIVED (This Receipt)</td>
                     <td class="value" style="border: none;">฿{{ number_format($mAmt, 2) }}</td>
                 </tr>
             </table>

@@ -101,6 +101,21 @@ class QuotationsTable
                         'Rejected' => 'Rejected',
                     ])
                     ->multiple(),
+                SelectFilter::make('sales_person')
+                    ->label('Filter By Sales Person')
+                    ->options(\App\Models\User::where('role', 'sales')->pluck('name', 'id'))
+                    ->query(function ($query, array $data) {
+                        if (!empty($data['value'])) {
+                            $query->where(function ($q) use ($data) {
+                                $q->whereHas('project.customer', function ($q) use ($data) {
+                                    $q->where('user_id', $data['value']);
+                                })->orWhereHas('customer', function ($q) use ($data) {
+                                    $q->where('user_id', $data['value']);
+                                });
+                            });
+                        }
+                    })
+                    ->visible(fn () => auth()->user()->role === 'admin'),
             ])
             ->recordActions([
                 ActionGroup::make([
@@ -132,11 +147,12 @@ class QuotationsTable
                             ])
                             ->form(fn ($record) => [
                                 \Filament\Forms\Components\Repeater::make('milestones')
-                                    ->relationship('milestones')
+                                    // ->relationship('milestones') // Removed to avoid automatic saving conflicts
                                     ->addable(false)
                                     ->deletable(false)
                                     ->columns(5)
                                     ->schema([
+                                        \Filament\Forms\Components\Hidden::make('id'),
                                         TextInput::make('label')
                                             ->label('Milestone')
                                             ->readOnly(),
@@ -176,6 +192,8 @@ class QuotationsTable
                                                 'Approved' => 'Approve',
                                                 'Rejected' => 'Reject',
                                             ])
+                                            // ->dehydrated(false) // Removed to ensure it is in the $data array
+                                            ->live()
                                             ->visible(fn ($get) => auth()->user()->role === 'admin' && filled($get('receipt_path'))),
                                         Placeholder::make('download_note')
                                             ->label('Action')
@@ -186,15 +204,20 @@ class QuotationsTable
                             ->action(function ($record, array $data) {
                                 $milestonesData = $data['milestones'] ?? [];
                                 foreach ($milestonesData as $mItem) {
-                                    $milestone = \App\Models\QuotationMilestone::find($mItem['id']);
+                                    $mId = $mItem['id'] ?? null;
+                                    if (!$mId) continue;
+                                    
+                                    $milestone = \App\Models\QuotationMilestone::find($mId);
                                     if (!$milestone) continue;
 
+                                    $receiptPath = $mItem['receipt_path'] ?? null;
+
                                     // Sales user uploading receipt
-                                    if (auth()->user()->role === 'sales' && filled($mItem['receipt_path'])) {
+                                    if (auth()->user()->role === 'sales' && filled($receiptPath)) {
                                         // Only update if status is Pending or Rejected
                                         if (in_array($milestone->status, ['Pending', 'Rejected'])) {
                                             $milestone->update([
-                                                'receipt_path' => $mItem['receipt_path'],
+                                                'receipt_path' => $receiptPath,
                                                 'status' => 'Paid',
                                                 'paid_at' => now(),
                                             ]);
@@ -209,7 +232,8 @@ class QuotationsTable
                                                 ->body("{$salesPerson} uploaded a receipt for {$milestone->label} (Quotation: {$quotationNo})")
                                                 ->icon('heroicon-o-currency-dollar')
                                                 ->color('info')
-                                                ->sendToDatabase($admins);
+                                                ->sendToDatabase($admins)
+                                                ->send(); // Toast for immediate feedback
                                         }
                                     }
 
@@ -222,15 +246,22 @@ class QuotationsTable
                                             'approved_by' => $adminAction === 'Approved' ? auth()->id() : null,
                                         ]);
 
+                                        // Ensure record relations are loaded
+                                        $record->loadMissing(['project.customer.user', 'customer.user']);
+
                                         // Notify Sales User
-                                        $salesUser = $record->project?->customer?->user ?? $record->customer?->user;
+                                        $projectUser = $record->project?->customer?->user;
+                                        $customerUser = $record->customer?->user;
+                                        $salesUser = $projectUser ?? $customerUser;
+                                        
                                         if ($salesUser) {
                                             \Filament\Notifications\Notification::make()
                                                 ->title($adminAction === 'Approved' ? 'Payment Approved' : 'Payment Rejected')
                                                 ->body("Your payment for {$milestone->label} has been {$adminAction}. (Quotation: {$record->quotation_number})")
                                                 ->icon($adminAction === 'Approved' ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
                                                 ->color($adminAction === 'Approved' ? 'success' : 'danger')
-                                                ->sendToDatabase($salesUser);
+                                                ->sendToDatabase($salesUser)
+                                                ->send(); // Toast
                                         }
                                     }
                                 }
