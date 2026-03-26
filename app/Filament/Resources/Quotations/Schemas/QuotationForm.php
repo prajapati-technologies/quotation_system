@@ -226,10 +226,6 @@ class QuotationForm
                                 return $options;
                             })
                             ->createOptionForm([
-                                Hidden::make('material_type_id')
-                                    ->default(fn (callable $get) => $get('material_type_id')),
-                                Hidden::make('parent_id')
-                                    ->default(fn (callable $get) => $get('color_id')),
                                 TextInput::make('name')
                                     ->label('Sub Color Name')
                                     ->required(),
@@ -237,6 +233,30 @@ class QuotationForm
                                     ->numeric()
                                     ->default(0)
                             ])
+                            ->createOptionUsing(function (array $data, callable $get) {
+                                // 1. Create the new Color
+                                $newColor = \App\Models\Color::create([
+                                    'material_type_id' => $get('material_type_id'),
+                                    'parent_id' => $get('color_id'),
+                                    'name' => $data['name'],
+                                    'additional_price' => $data['additional_price'] ?? 0,
+                                ]);
+
+                                // 2. Link it to the current ProductColorPrice record if it exists
+                                $productId = $get('product_id');
+                                $mainColorId = $get('color_id');
+                                if ($productId && $mainColorId) {
+                                    $priceRecord = \App\Models\ProductColorPrice::where('product_id', $productId)
+                                        ->where('main_color_id', $mainColorId)
+                                        ->first();
+                                    
+                                    if ($priceRecord) {
+                                        $priceRecord->subColors()->attach($newColor->id);
+                                    }
+                                }
+
+                                return $newColor->id;
+                            })
                             ->required()
                             ->live()
                             ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get)),
