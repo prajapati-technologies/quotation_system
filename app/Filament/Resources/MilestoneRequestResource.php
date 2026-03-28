@@ -72,7 +72,7 @@ class MilestoneRequestResource extends Resource
             ->columns([
                 TextColumn::make('formatted_reference')
                     ->label('Ref (CN / QT)')
-                    ->searchable(['quotation_number'])
+                    ->searchable()
                     ->sortable(),
                 TextColumn::make('project.name')
                     ->label('Project')
@@ -90,7 +90,7 @@ class MilestoneRequestResource extends Resource
                     ->sortable()
             ])
             ->actions([
-                \Filament\Tables\Actions\Action::make('reviewCustomMilestones')
+                Action::make('reviewCustomMilestones')
                     ->label('Review Request')
                     ->icon('heroicon-o-adjustments-horizontal')
                     ->color('warning')
@@ -143,7 +143,10 @@ class MilestoneRequestResource extends Resource
                             $color = 'danger';
                         }
 
-                        $record->update(['custom_milestone_request' => null]);
+                        $record->update([
+                            'custom_milestone_request' => null,
+                            'milestone_request_status' => $data['admin_action'] === 'approve' ? 'Approved' : 'Rejected'
+                        ]);
 
                         $salesUser = $record->project?->customer?->user ?? $record->customer?->user;
                         if ($salesUser) {

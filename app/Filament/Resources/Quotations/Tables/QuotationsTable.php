@@ -89,6 +89,20 @@ class QuotationsTable
                     ->sortable()
                     ->description(fn ($record) => $record->created_at->diffForHumans())
                     ->toggleable(),
+                    
+                TextColumn::make('milestone_request_status')
+                    ->label('Custom Milestone')
+                    ->badge()
+                    ->color(fn (?string $state): string => match ($state) {
+                        'Pending' => 'warning',
+                        'Approved' => 'success',
+                        'Rejected' => 'danger',
+                        default => 'gray',
+                    })
+                    ->visible(fn () => auth()->user()->role === 'sales')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
 
             ])
             ->filters([
@@ -293,7 +307,7 @@ class QuotationsTable
                         ->label('Request Custom Milestones')
                         ->icon('heroicon-o-adjustments-horizontal')
                         ->color('warning')
-                        ->visible(fn (\App\Models\Quotation $record) => auth()->user()->role === 'sales' && empty($record->custom_milestone_request) && in_array($record->status, ['Draft', 'Approved']))
+                        ->visible(fn (\App\Models\Quotation $record) => auth()->user()->role === 'sales' && in_array($record->status, ['Draft', 'Approved']))
                         ->form([
                             \Filament\Forms\Components\Repeater::make('requested_milestones')
                                 ->label('Custom Breakdown')
@@ -321,7 +335,8 @@ class QuotationsTable
                         ])
                         ->action(function (\App\Models\Quotation $record, array $data) {
                             $record->update([
-                                'custom_milestone_request' => $data['requested_milestones']
+                                'custom_milestone_request' => $data['requested_milestones'],
+                                'milestone_request_status' => 'Pending'
                             ]);
 
                             $admins = \App\Models\User::where('role', 'admin')->get();
@@ -392,7 +407,10 @@ class QuotationsTable
                                 $color = 'danger';
                             }
 
-                            $record->update(['custom_milestone_request' => null]);
+                            $record->update([
+                                'custom_milestone_request' => null,
+                                'milestone_request_status' => $data['admin_action'] === 'approve' ? 'Approved' : 'Rejected'
+                            ]);
 
                             $salesUser = $record->project?->customer?->user ?? $record->customer?->user;
                             if ($salesUser) {
