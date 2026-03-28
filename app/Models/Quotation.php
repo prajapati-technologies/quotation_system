@@ -22,6 +22,7 @@ class Quotation extends Model
         'partial_payment_at' => 'datetime',
         'full_payment_at' => 'datetime',
         'full_payment_balance_amount' => 'decimal:2',
+        'custom_milestone_request' => 'array',
     ];
 
     public function customer()

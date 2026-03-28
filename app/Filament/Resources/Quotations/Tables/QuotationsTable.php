@@ -124,7 +124,7 @@ class QuotationsTable
                         ->modalWidth('7xl'),
 
                     EditAction::make()
-                        ->visible(fn (\App\Models\Quotation $record) => auth()->user()->role === 'sales' && in_array($record->status, ['Draft', 'Approved'])),
+                        ->visible(fn (\App\Models\Quotation $record) => auth()->user()->role === 'admin' || (auth()->user()->role === 'sales' && in_array($record->status, ['Draft', 'Approved']))),
 
                     ActionGroup::make([
                         Action::make('downloadQuotationPdf')
@@ -288,6 +288,128 @@ class QuotationsTable
                         ->icon('heroicon-o-arrow-down-tray')
                         ->color('gray')
                         ->button(),
+
+                    Action::make('requestCustomMilestones')
+                        ->label('Request Custom Milestones')
+                        ->icon('heroicon-o-adjustments-horizontal')
+                        ->color('warning')
+                        ->visible(fn (\App\Models\Quotation $record) => auth()->user()->role === 'sales' && empty($record->custom_milestone_request) && in_array($record->status, ['Draft', 'Approved']))
+                        ->form([
+                            \Filament\Forms\Components\Repeater::make('requested_milestones')
+                                ->label('Custom Breakdown')
+                                ->schema([
+                                    TextInput::make('label')->required()->placeholder('e.g. 30% Advance'),
+                                    TextInput::make('percentage')->numeric()->required()->minValue(1)->maxValue(100)->suffix('%'),
+                                ])
+                                ->columns(2)
+                                ->default([
+                                    ['label' => 'Advance', 'percentage' => 30],
+                                    ['label' => 'Mid', 'percentage' => 30],
+                                    ['label' => 'Mid 2', 'percentage' => 30],
+                                    ['label' => 'Final', 'percentage' => 10],
+                                ])
+                                ->rules([
+                                    function () {
+                                        return function (string $attribute, $value, \Closure $fail) {
+                                            $total = collect($value)->sum('percentage');
+                                            if (round($total) != 100) {
+                                                $fail("Total percentage must be exactly 100%. Current: {$total}%");
+                                            }
+                                        };
+                                    }
+                                ])
+                        ])
+                        ->action(function (\App\Models\Quotation $record, array $data) {
+                            $record->update([
+                                'custom_milestone_request' => $data['requested_milestones']
+                            ]);
+
+                            $admins = \App\Models\User::where('role', 'admin')->get();
+                            \Filament\Notifications\Notification::make()
+                                ->title('Custom Milestone Request')
+                                ->body(auth()->user()->name . " requested a custom milestone breakdown for {$record->formatted_reference}.")
+                                ->icon('heroicon-o-adjustments-horizontal')
+                                ->color('warning')
+                                ->sendToDatabase($admins)
+                                ->send();
+
+                            \Filament\Notifications\Notification::make()
+                                ->title('Request Sent')
+                                ->success()
+                                ->send();
+                        }),
+
+                    Action::make('reviewCustomMilestones')
+                        ->label('Review Milestone Request')
+                        ->icon('heroicon-o-adjustments-horizontal')
+                        ->color('warning')
+                        ->visible(fn (\App\Models\Quotation $record) => auth()->user()->role === 'admin' && !empty($record->custom_milestone_request))
+                        ->form(fn (\App\Models\Quotation $record) => [
+                            Placeholder::make('info')
+                                ->label('')
+                                ->content('Sales requested the following milestone breakdown for this quotation:'),
+                            \Filament\Forms\Components\Repeater::make('requested_milestones')
+                                ->label('')
+                                ->schema([
+                                    TextInput::make('label')->disabled(),
+                                    TextInput::make('percentage')->disabled()->suffix('%'),
+                                ])
+                                ->columns(2)
+                                ->default($record->custom_milestone_request)
+                                ->addable(false)
+                                ->deletable(false)
+                                ->reorderable(false),
+                            Select::make('admin_action')
+                                ->label('Decision')
+                                ->options([
+                                    'approve' => 'Approve & Apply Request',
+                                    'reject' => 'Reject Request'
+                                ])
+                                ->required()
+                        ])
+                        ->action(function (\App\Models\Quotation $record, array $data) {
+                            if ($data['admin_action'] === 'approve') {
+                                // Delete existing milestones
+                                $record->milestones()->delete();
+                                
+                                // Insert new milestones
+                                $finalPrice = floatval($record->final_price);
+                                foreach ($record->custom_milestone_request as $req) {
+                                    $record->milestones()->create([
+                                        'label' => $req['label'],
+                                        'percentage' => $req['percentage'],
+                                        'amount' => round($finalPrice * (floatval($req['percentage']) / 100), 2),
+                                        'status' => 'Pending'
+                                    ]);
+                                }
+
+                                $statusStr = 'Approved and Applied';
+                                $icon = 'heroicon-o-check-circle';
+                                $color = 'success';
+                            } else {
+                                $statusStr = 'Rejected';
+                                $icon = 'heroicon-o-x-circle';
+                                $color = 'danger';
+                            }
+
+                            $record->update(['custom_milestone_request' => null]);
+
+                            $salesUser = $record->project?->customer?->user ?? $record->customer?->user;
+                            if ($salesUser) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Milestone Request ' . $statusStr)
+                                    ->body("Your custom milestone request for {$record->formatted_reference} was {$statusStr}.")
+                                    ->icon($icon)
+                                    ->color($color)
+                                    ->sendToDatabase($salesUser)
+                                    ->send();
+                            }
+
+                            \Filament\Notifications\Notification::make()
+                                ->title("Request {$statusStr}")
+                                ->success()
+                                ->send();
+                        }),
 
                     Action::make('sign')
                         ->label('Sign')

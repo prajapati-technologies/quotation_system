@@ -301,17 +301,21 @@ class QuotationForm
 
                 // SECTION 2.5: MILESTONES
                 Section::make('Payment Milestones')
-                    ->description('Break down the total price into payment milestones. Total must be 100%.')
+                    ->description('Payment milestones are automatically set from the admin-configured template. Only Admin can modify the breakdown.')
                     ->icon('heroicon-o-banknotes')
                     ->schema([
                         Repeater::make('milestones')
                             ->label('Breakdown')
                             ->relationship('milestones')
+                            // Admin can add/remove rows; sales cannot
+                            ->addable(fn() => auth()->user()->role === 'admin')
+                            ->deletable(fn() => auth()->user()->role === 'admin')
+                            ->reorderable(fn() => auth()->user()->role === 'admin')
                             ->rules([
                                 function () {
                                     return function (string $attribute, $value, \Closure $fail) {
                                         $total = collect($value)->sum('percentage');
-                                        if ($total != 100) {
+                                        if (round($total) != 100) {
                                             $fail("The total milestone percentage must be exactly 100%. Current: {$total}%");
                                         }
                                     };
@@ -322,6 +326,9 @@ class QuotationForm
                                     ->label('Milestone Name')
                                     ->required()
                                     ->placeholder('e.g. Down Payment, Installation')
+                                    // Sales user cannot edit label
+                                    ->disabled(fn() => auth()->user()->role !== 'admin')
+                                    ->dehydrated()
                                     ->columnSpan(2),
                                 TextInput::make('percentage')
                                     ->label('Percentage (%)')
@@ -331,6 +338,9 @@ class QuotationForm
                                     ->suffix('%')
                                     ->minValue(1)
                                     ->maxValue(100)
+                                    // Sales user cannot edit percentage — it is fixed by admin
+                                    ->disabled(fn() => auth()->user()->role !== 'admin')
+                                    ->dehydrated()
                                     ->afterStateUpdated(function ($state, $set, $get) {
                                         $finalPrice = floatval($get('../../final_price'));
                                         $set('amount', round($finalPrice * (floatval($state) / 100), 2));
@@ -345,10 +355,26 @@ class QuotationForm
                                     ->columnSpan(1),
                             ])
                             ->columns(4)
-                            ->default([
-                                ['label' => 'Down Payment', 'percentage' => 50, 'amount' => 0],
-                                ['label' => 'Final Payment', 'percentage' => 50, 'amount' => 0],
-                            ])
+                            ->default(function () {
+                                // Load from admin-configured template in settings
+                                $raw = \App\Models\Setting::get('milestone_template');
+                                if ($raw) {
+                                    $template = json_decode($raw, true);
+                                    if (is_array($template) && count($template) > 0) {
+                                        return array_map(fn($m) => [
+                                            'label'      => $m['label'] ?? 'Payment',
+                                            'percentage' => $m['percentage'] ?? 0,
+                                            'amount'     => 0,
+                                        ], $template);
+                                    }
+                                }
+                                // Fallback default
+                                return [
+                                    ['label' => 'Down Payment',  'percentage' => 50, 'amount' => 0],
+                                    ['label' => 'Mid Payment',   'percentage' => 40, 'amount' => 0],
+                                    ['label' => 'Final Payment', 'percentage' => 10, 'amount' => 0],
+                                ];
+                            })
                             ->columnSpanFull()
                     ]),
 

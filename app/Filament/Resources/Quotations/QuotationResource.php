@@ -59,6 +59,23 @@ class QuotationResource extends Resource
         return auth()->check() && auth()->user()->role === 'sales';
     }
 
+    public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        if (!auth()->check()) return false;
+        
+        // Admin can always edit (e.g., to adjust payment milestones)
+        if (auth()->user()->role === 'admin') {
+            return true;
+        }
+
+        // Sales can edit only if status is Draft or Approved
+        if (auth()->user()->role === 'sales') {
+            return in_array($record->status, ['Draft', 'Approved']);
+        }
+
+        return false;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return QuotationForm::configure($schema);
