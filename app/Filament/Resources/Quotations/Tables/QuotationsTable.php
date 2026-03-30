@@ -534,11 +534,14 @@ class QuotationsTable
             'milestoneId' => $milestoneId,
         ]);
 
+        $customerName = $quotation->customer?->name ?? $quotation->project?->customer?->name ?? 'Customer';
+        
         $fileStem = match ($documentType) {
-            'invoice' => 'Invoice-'.$quotation->invoice_number,
-            'receipt_partial' => 'Receipt-'.$quotation->receipt_number_partial,
-            'receipt_full' => 'Receipt-'.$quotation->receipt_number_full,
-            default => 'Quotation-'.$quotation->quotation_number,
+            'invoice' => "Invoice-{$quotation->invoice_number}-{$quotation->quotation_number}-{$customerName}",
+            'receipt_partial' => "Receipt-{$quotation->receipt_number_partial}-{$quotation->quotation_number}-{$customerName}",
+            'receipt_full' => "Receipt-{$quotation->receipt_number_full}-{$quotation->quotation_number}-{$customerName}",
+            'receipt_milestone' => "Receipt-Milestone-{$quotation->quotation_number}-{$customerName}",
+            default => "Quotation-{$quotation->quotation_number}-{$customerName}",
         };
 
         $safeName = preg_replace('/[^\w\-.]+/u', '_', $fileStem).'.pdf';

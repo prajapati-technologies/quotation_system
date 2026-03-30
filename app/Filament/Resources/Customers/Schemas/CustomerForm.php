@@ -26,11 +26,15 @@ class CustomerForm
 
                 TextInput::make('mobile')
                     ->label('Mobile Number')
-                    ->placeholder('Enter 10-digit mobile number')
+                    ->placeholder('Enter mobile number (e.g., +91978332713445)')
                     ->tel()
                     ->required()
-                    ->length(10)
-                    ->numeric()
+                    ->minLength(10)
+                    ->maxLength(15)
+                    ->regex('/^\+?[0-9]+$/')
+                    ->validationMessages([
+                        'regex' => 'The mobile number must only contain digits and optionally start with +.',
+                    ])
                     ->autocomplete(false),
 
                 Textarea::make('address')
