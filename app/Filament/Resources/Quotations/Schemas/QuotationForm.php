@@ -389,15 +389,33 @@ class QuotationForm
                                 TextInput::make('discount')->label('Total Discount')->readOnly()->dehydrated(true)->prefix('฿'),
                                 TextInput::make('total_price')->label('Total (Before VAT)')->readOnly()->dehydrated(true)->prefix('฿'),
                                 
+                                TextInput::make('delivery_distance')
+                                    ->label('Delivery Distance (km)')
+                                    ->numeric()
+                                    ->default(0)
+                                    ->live()
+                                    ->columnSpan(1)
+                                    ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get))
+                                    ->prefixIcon('heroicon-o-truck'),
+
+                                TextInput::make('delivery_charge')
+                                    ->label('Delivery Charge')
+                                    ->readOnly()
+                                    ->dehydrated(true)
+                                    ->prefix('฿')
+                                    ->columnSpan(1),
+
                                 TextInput::make('vat_total')
                                     ->label('VAT (' . \App\Models\Setting::get('vat_percent', 7) . '%)')
                                     ->readOnly()
                                     ->dehydrated(true)
-                                    ->prefix('฿'),
+                                    ->prefix('฿')
+                                    ->columnSpan(1),
 
                                 Hidden::make('vat_percent')->dehydrated(true),
-                                    
+
                                 TextInput::make('final_price')->label('Grand Total')->readOnly()->dehydrated(true)->prefix('฿')
+                                    ->columnSpan(1)
                                     ->extraAttributes(['class' => 'font-bold text-xl text-primary-600']),
                             ]),
                     ]),
@@ -462,7 +480,11 @@ class QuotationForm
             $totalDiscount += $discountValue;
         }
 
-        $totalBeforeVat = $totalGrossGoods - $totalDiscount + $totalInstallation;
+        $deliveryKm = floatval($get('delivery_distance') ?? 0);
+        $deliveryCharge = $deliveryKm * 30;
+        $set('delivery_charge', number_format($deliveryCharge, 2, '.', ''));
+
+        $totalBeforeVat = $totalGrossGoods - $totalDiscount + $totalInstallation + $deliveryCharge;
         $vatAmount = $totalBeforeVat * ($vatPercent / 100);
         $grandTotal = $totalBeforeVat + $vatAmount;
 

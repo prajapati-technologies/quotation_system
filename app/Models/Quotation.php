@@ -16,6 +16,8 @@ class Quotation extends Model
         'discount' => 'decimal:2',
         'vat_percent' => 'decimal:2',
         'vat_total' => 'decimal:2',
+        'delivery_distance' => 'decimal:2',
+        'delivery_charge' => 'decimal:2',
         'final_price' => 'decimal:2',
         'partial_payment_percent' => 'decimal:2',
         'partial_payment_amount' => 'decimal:2',
