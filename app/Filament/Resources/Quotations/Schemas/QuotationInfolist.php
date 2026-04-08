@@ -198,6 +198,17 @@ class QuotationInfolist
                             ->formatStateUsing(fn ($record) => number_format(floatval($record->vat_total ?? 0), 2))
                             ->disabled(),
 
+                        TextInput::make('delivery_distance')
+                            ->label('Delivery Distance (km)')
+                            ->suffix('km')
+                            ->disabled(),
+
+                        TextInput::make('delivery_charge')
+                            ->label('Delivery Charge')
+                            ->prefix('฿')
+                            ->formatStateUsing(fn ($record) => number_format(floatval($record->delivery_charge ?? 0), 2))
+                            ->disabled(),
+
                          Placeholder::make('final_price')
                             ->label('Grand Total')
                             ->columnSpanFull()

@@ -394,7 +394,6 @@ class QuotationForm
                                     ->numeric()
                                     ->default(0)
                                     ->live()
-                                    ->columnSpan(1)
                                     ->afterStateUpdated(fn($set, $get) => self::updatePrices($set, $get))
                                     ->prefixIcon('heroicon-o-truck'),
 
@@ -402,20 +401,18 @@ class QuotationForm
                                     ->label('Delivery Charge')
                                     ->readOnly()
                                     ->dehydrated(true)
-                                    ->prefix('฿')
-                                    ->columnSpan(1),
+                                    ->prefix('฿'),
 
                                 TextInput::make('vat_total')
                                     ->label('VAT (' . \App\Models\Setting::get('vat_percent', 7) . '%)')
                                     ->readOnly()
                                     ->dehydrated(true)
-                                    ->prefix('฿')
-                                    ->columnSpan(1),
+                                    ->prefix('฿'),
 
                                 Hidden::make('vat_percent')->dehydrated(true),
 
                                 TextInput::make('final_price')->label('Grand Total')->readOnly()->dehydrated(true)->prefix('฿')
-                                    ->columnSpan(1)
+                                    ->columnSpan(['lg' => 3])
                                     ->extraAttributes(['class' => 'font-bold text-xl text-primary-600']),
                             ]),
                     ]),

@@ -438,6 +438,12 @@
                     <td class="label">Total Installation Fees</td>
                     <td class="value">฿{{ number_format($quotation->installation_total, 2) }}</td>
                 </tr>
+                @if($quotation->delivery_charge > 0)
+                <tr>
+                    <td class="label">Delivery Charges ({{ number_format($quotation->delivery_distance, 1) }} km)</td>
+                    <td class="value">฿{{ number_format($quotation->delivery_charge, 2) }}</td>
+                </tr>
+                @endif
                 <tr style="border-top: 1px solid #333;">
                     <td class="label">Subtotal (Net)</td>
                     <td class="value">฿{{ number_format($quotation->total_price, 2) }}</td>
